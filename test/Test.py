@@ -1,4 +1,4 @@
-from device.DeviceCommonOperation import DeviceCommonOperation
 from device.DeviceConnect import DeviceInfo
+from device.DeviceManager import DeviceManager
 
-DeviceCommonOperation(DeviceInfo("NAB0220416035468"))
+DeviceManager(DeviceInfo("NAB0220416035468"))

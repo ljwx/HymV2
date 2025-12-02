@@ -26,3 +26,5 @@ class DeviceCommonOperation(DeviceConnect):
         end_y = int(height * end_y_ratio)
 
         self.dev.swipe((start_x, start_y), (end_x, end_y))
+    def click_id(self):
+        self.poco()
