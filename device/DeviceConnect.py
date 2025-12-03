@@ -39,6 +39,7 @@ class DeviceConnect(DeviceDurationConfig):
             self.dev.unlock()
             sleep(1.5)
             self.swipe_up_unlock()
+            sleep(1.5)
         else:
             print()
 

@@ -1,9 +1,10 @@
 import random
 
-from device.DeviceConnect import DeviceConnect, DeviceInfo
+from device.DeviceConnect import DeviceInfo
+from device.DeviceFindView import DeviceFindView
 
 
-class DeviceCommonOperation(DeviceConnect):
+class DeviceCommonOperation(DeviceFindView):
     def __init__(self, device_info: DeviceInfo):
         super().__init__(device_info)
 
