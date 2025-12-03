@@ -1,4 +1,3 @@
-from device.DeviceConnect import DeviceInfo
-from device.DeviceManager import DeviceManager
+from launch.AppLaunch import AppLaunch
 
-DeviceManager(DeviceInfo("NAB0220416035468"))
+AppLaunch()

@@ -5,18 +5,16 @@ from airtest.core.helper import G
 from poco.drivers.android.uiautomation import AndroidUiautomationPoco
 
 from device.DeviceDurationConfig import DeviceDurationConfig
+from device.DeviceInfo import DeviceInfo
 from logevent.DeviceRunningLog import DeviceRunningLog
-
-
-class DeviceInfo:
-    def __init__(self, serial):
-        self.serial_no = serial
 
 
 class DeviceConnect(DeviceDurationConfig):
     dev: Android  # Android(serial="192.168.1.100:5555")
     poco: AndroidUiautomationPoco
     logEvent: DeviceRunningLog
+
+    default_wait_view_timeout = 10
 
     def __init__(self, device_info: DeviceInfo):
         super(DeviceConnect, self).__init__(level=1)
@@ -30,7 +28,6 @@ class DeviceConnect(DeviceDurationConfig):
             use_airtest_input=True,  # 启用Airtest输入（解决中文输入问题）
             screenshot_each_action=False  # 关闭每次操作自动截图（提升速度）
         )
-        sleep(3)
         self.init_device()
 
     def get_screen_size(self):
@@ -96,61 +93,63 @@ class DeviceConnect(DeviceDurationConfig):
         self.dev.get_top_activity_name()
         return self.dev.check_app(package_name)
 
-    def get_current_package(self) -> str:
+    def get_top_activity(self) -> tuple:
         try:
-            # 方法1：使用 dumpsys window 命令
-            output = self.dev.shell("dumpsys window windows | grep -E 'mCurrentFocus|mFocusedApp'")
-            if output:
-                # 解析输出，提取包名
-                # 输出格式类似：mCurrentFocus=Window{xxx u0 com.example.app/.MainActivity}
-                lines = output.strip().split('\n')
-                for line in lines:
-                    if 'mCurrentFocus' in line or 'mFocusedApp' in line:
-                        # 提取包名部分
-                        parts = line.split()
-                        for part in parts:
-                            if '/' in part:
-                                package = part.split('/')[0]
-                                # 清理可能的特殊字符
-                                package = package.split('{')[-1] if '{' in package else package
-                                if package.startswith('com.'):
-                                    return package
-            return ""
+            act_name = self.dev.get_top_activity_name()
+            list = act_name.split("/.")
+            if len(list) == 1:
+                list = act_name.split("/")
+            print(list)
+            if len(list) == 2:
+                return list[0], list[1]
+            return act_name, ""
         except Exception as e:
             print(f"获取当前应用包名失败: {e}")
-            return ""
+            return "", ""
 
     def is_app_running(self, package_name: str) -> bool:
-        current_package = self.get_current_package()
-        return current_package == package_name
+        return self.get_top_activity()[0] == package_name
 
-    def wait_for_app(self, package_name: str, timeout: int = 10) -> bool:
-        import time
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            if self.is_app_running(package_name):
+    def exist_by_id(self, resource_id: str, timeout=default_wait_view_timeout) -> bool:
+        return self.poco(resourceId=resource_id).wait(timeout=timeout).exists()
+
+    def exist_by_name(self, resource_name: str, timeout=default_wait_view_timeout) -> bool:
+        return self.poco(name=resource_name).wait(timeout=timeout).exists()
+
+    def exist_by_text(self, text: str, timeout=default_wait_view_timeout) -> bool:
+        return self.poco(text=text).wait(timeout=timeout).exists()
+
+    def exist_by_desc(self, desc: str, timeout=default_wait_view_timeout) -> bool:
+        return self.poco(desc=desc).wait(timeout=timeout).exists()
+
+    def click_by_id(self, resource_id: str, timeout=default_wait_view_timeout) -> bool:
+        if self.exist_by_id(resource_id, timeout=timeout):
+            sleep(self.get_click_wait_time())
+            result = self.poco(resourceId=resource_id).click(focus=self.get_click_position())
+            if result is None or result:
                 return True
-            sleep(0.5)
         return False
 
-    def exist_by_id(self, resource_id: str) -> bool:
-        return self.poco(resourceId=resource_id).wait().exists()
+    def click_by_name(self, name: str, timeout=default_wait_view_timeout) -> bool:
+        if self.exist_by_name(name, timeout=timeout):
+            sleep(self.get_click_wait_time())
+            result = self.poco(name=name).click(focus=self.get_click_position())
+            if result is None or result:
+                return True
+        return False
 
-    def exist_by_name(self, resource_name: str) -> bool:
-        return self.poco(name=resource_name).wait().exists()
+    def click_by_text(self, text: str, timeout=default_wait_view_timeout) -> bool:
+        if self.exist_by_text(text, timeout=timeout):
+            sleep(self.get_click_wait_time())
+            result = self.poco(text=text).click()
+            if result is None or result:
+                return True
+        return False
 
-    def exist_by_text(self, resource_text: str) -> bool:
-        return self.poco(text=resource_text).wait().exists()
-
-    def click_by_id(self, resource_id: str):
-        self.poco(resourceId=resource_id).click()
-
-    def click_by_name(self, name: str):
-        self.poco(name=name).click()
-
-    def click_by_text(self, text: str):
-        # todo待确认
-        self.poco(text=text).click()
-
-    def click_by_desc(self, desc: str):
-        self.poco(desc=desc).click()
+    def click_by_desc(self, desc: str, timeout=default_wait_view_timeout) -> bool:
+        if self.exist_by_desc(desc, timeout=timeout):
+            sleep(self.get_click_wait_time())
+            result = self.poco(desc=desc).click(focus=self.get_click_position())
+            if result is None or result:
+                return True
+        return False
