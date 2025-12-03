@@ -6,9 +6,8 @@ from device.DeviceManager import DeviceManager
 
 
 class AppLaunch:
-
-    device:DeviceManager = DeviceManager(HwP40())
-    packageInfo:AppPackageInfo = TestApp
+    device: DeviceManager = DeviceManager(HwP40())
+    packageInfo: AppPackageInfo = TestApp
 
     def __init__(self):
         self.device.init_status()
@@ -17,6 +16,28 @@ class AppLaunch:
     def launchApp(self):
         if not self.device.is_app_running(self.packageInfo.package_name):
             self.device.start_app(self.packageInfo.package_name)
+        self.sign_in()
 
     def clean_dialog(self):
-        pass
+        sleep(3)
+        self.device.press_back()
+        sleep(4)
+        self.device.press_back()
+
+    def is_content_page(self):
+        return self.device.exist_by_id("com.kuaishou.nebula:id/nasa_milano_progress_container")
+
+    def go_task_tab(self):
+        self.device.click_by_id()
+
+    def sign_in(self):
+        if self.device.exist_by_id("今日签到可领"):
+            if self.device.click_by_id("立即签到"):
+                sleep(2)
+                if self.device.exist_by_text("明日签到可领"):
+                    print("签到成功")
+
+    def sign_in_after_task(self):
+        self.device.click_by_text("去看视频")
+        if self.device.click_by_id("com.kuaishou.nebula.commercial_neo:id/video_countdown_end_icon", timeout=35):
+            print("看视频完成")
