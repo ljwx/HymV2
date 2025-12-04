@@ -36,11 +36,17 @@ class AppLaunch:
                 sleep(2)
                 if self.device.exist_by_text("明日签到可领"):
                     print("签到成功")
+                    self.sign_in_after_task()
+
 
     def sign_in_after_task(self):
         self.device.click_by_text("去看视频")
         if self.device.click_by_id("com.kuaishou.nebula.commercial_neo:id/video_countdown_end_icon", timeout=35):
             print("看视频完成")
+            if self.device.click_by_text("领取额外金币"):
+                self.device.click_by_text("拒绝", timeout=4) #打开其他app
+                self.device.click_by_id("com.kuaishou.nebula.commercial_neo:id/video_countdown_end_icon", timeout=35)
+
 
     def test(self):
         self.device.exist_by_image(image_path="test/kn_test.png")
