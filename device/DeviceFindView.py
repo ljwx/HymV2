@@ -10,8 +10,8 @@ class DeviceFindView(DeviceBase):
         super().__init__(device_info)
 
     def _get_position_by_id(self, resource_id: str, timeout=10) -> tuple[float, float] | None:
-        if self.exist_by_id(resource_id, timeout=timeout):
-            element = self.poco(resourceId=resource_id)
+        element = self.exist_by_id(resource_id, timeout=timeout)
+        if element is not None:
             position = element.get_position()
             return position
         return None

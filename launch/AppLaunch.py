@@ -25,7 +25,7 @@ class AppLaunch:
         self.device.press_back()
 
     def is_content_page(self):
-        return self.device.exist_by_id("com.kuaishou.nebula:id/nasa_milano_progress_container")
+        return self.device.exist_by_id("com.kuaishou.nebula:id/nasa_milano_progress_container") is not None
 
     def go_task_tab(self):
         self.device.click_by_id()

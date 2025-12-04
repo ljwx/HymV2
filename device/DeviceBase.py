@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 from time import sleep
+from typing import Any
+
 from airtest.core.android.android import Android
 from airtest.core.api import exists, touch, wait, click
 from airtest.core.error import TargetNotFoundError
@@ -141,6 +143,15 @@ class DeviceBase(DeviceRandomConfig):
         resource_dir = project_root / "resource"
         resource_path = resource_dir / relative_path
         return str(resource_path.resolve())
+
+    def get_view_attr(self, ui: UIObjectProxy, attr_name: str) -> str:
+        """
+        zOrders,boundsInParent
+        """
+        try:
+            return ui.attr(attr_name)
+        except Exception as e:
+            return ""
 
     def exist_by_id(self, resource_id: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         element = self.poco(resourceId=resource_id).wait(timeout=timeout)
