@@ -11,12 +11,12 @@ class AppLaunch:
 
     def __init__(self):
         self.device.init_status()
-        self.launchApp()
+        # self.launchApp()
+        self.test()
 
     def launchApp(self):
         if not self.device.is_app_running(self.packageInfo.package_name):
             self.device.start_app(self.packageInfo.package_name)
-        self.sign_in()
 
     def clean_dialog(self):
         sleep(3)
@@ -41,3 +41,6 @@ class AppLaunch:
         self.device.click_by_text("去看视频")
         if self.device.click_by_id("com.kuaishou.nebula.commercial_neo:id/video_countdown_end_icon", timeout=35):
             print("看视频完成")
+
+    def test(self):
+        self.device.exist_by_image(image_path="test/kn_test.png")

@@ -1,7 +1,7 @@
 import random
 
 
-class DeviceDurationConfig:
+class DeviceRandomConfig:
 
     def __init__(self, level: int = 1):
         self.duration_level = level
@@ -18,7 +18,12 @@ class DeviceDurationConfig:
     def get_click_wait_time(self) -> float:
         return self.duration_level * self._get_click_timeout()
 
-    def get_click_position(self) -> tuple[float, float]:
+    def get_click_position_offset(self) -> tuple[float, float]:
         x = random.uniform(0.03, 0.97)
         y = random.uniform(0.03, 0.97)
+        return x, y
+
+    def get_touch_position_offset(self, pos: tuple[float, float]) -> tuple[float, float]:
+        x = pos[0] + random.uniform(-8, 8)
+        y = pos[1] + random.uniform(-8, 8)
         return x, y

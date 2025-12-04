@@ -1,5 +1,5 @@
-from device.DeviceCommonOperation import DeviceCommonOperation
-from device.DeviceConnect import DeviceInfo
+from device.DeviceUserOperation import DeviceCommonOperation
+from device.DeviceBase import DeviceInfo
 
 
 class DeviceManager(DeviceCommonOperation):

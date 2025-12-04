@@ -1,6 +1,6 @@
 import random
 
-from device.DeviceConnect import DeviceInfo
+from device.DeviceBase import DeviceInfo
 from device.DeviceFindView import DeviceFindView
 
 
