@@ -114,7 +114,7 @@ class DeviceBase(DeviceRandomConfig):
             list = act_name.split("/.")
             if len(list) == 1:
                 list = act_name.split("/")
-            print(list)
+            print("当前顶部activity", list)
             if len(list) == 2:
                 return list[0], list[1]
             return act_name, ""

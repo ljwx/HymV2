@@ -1,8 +1,9 @@
 from poco.proxy import UIObjectProxy
-from airtest.core.api import Template, exists, touch
 
+from constant.Const import ConstViewType
 from device.DeviceBase import DeviceBase
 from device.DeviceInfo import DeviceInfo
+from device.uiview.UIInfo import UITargetInfo
 
 
 class DeviceFindView(DeviceBase):
@@ -75,3 +76,37 @@ class DeviceFindView(DeviceBase):
         except Exception as e:
             print(f"{e}")
         return None
+
+    def __size_match(self, ui_size: tuple[float, float], info_size: tuple[float, float]) -> bool:
+        size_diff = 0.05
+        width = abs(ui_size[0] - info_size[0]) < size_diff
+        height = abs(ui_size[1] - info_size[1]) < size_diff
+        return width and height
+
+    def find_ui_by_info(self, ui_info: UITargetInfo, timeout=3) -> UIObjectProxy | None:
+        types = self.poco(type=ui_info.ui_name).wait(timeout=timeout)
+        for type in types:
+            size_match = True
+            parent_match = True
+            if ui_info.size is not None:
+                if not self.__size_match(type.get_size(), ui_info.size):
+                    size_match = False
+            if ui_info.parent_name is not None:
+                parent = types.parent()
+                if not parent.exists() or not parent.get_name() == ui_info.parent_name:
+                    parent_match = False
+            if size_match and parent_match:
+                return type
+        return None
+
+    def find_ui_and_click(self, ui_info: UITargetInfo, timeout=3) -> bool:
+        ui = self.find_ui_by_info(ui_info, timeout=timeout)
+        if ui:
+            ui.click(focus=self.get_click_position_offset())
+            return True
+        else:
+            return False
+
+    def example(self):
+        self.find_ui_and_click(
+            UITargetInfo(ConstViewType.Text, size=(0.1733, 0.0262), parent_name=ConstViewType.Linear))
