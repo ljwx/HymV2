@@ -7,4 +7,4 @@ class DeviceManager(DeviceCommonOperation):
         super().__init__(device_info)
 
     def init_status(self):
-        self.init_device()
+        pass

@@ -23,8 +23,10 @@ class DeviceBase(DeviceRandomConfig):
     poco: AndroidUiautomationPoco
     logEvent: DeviceRunningLog
 
-    default_wait_view_timeout = 10
+    default_wait_view_timeout = 8
     _project_root: Path | None = None  # 缓存项目根目录
+
+    screen_size = None
 
     def __init__(self, device_info: DeviceInfo):
         super(DeviceBase, self).__init__(level=1)
@@ -40,9 +42,11 @@ class DeviceBase(DeviceRandomConfig):
         )
         self.init_device()
 
-    def get_screen_size(self):
-        screen_size = self.poco.get_screen_size()
-        return screen_size
+    def get_screen_size(self) -> tuple[int, int]:
+        if self.screen_size is None:
+            screen_size = self.poco.get_screen_size()
+            self.screen_size = screen_size
+        return self.screen_size
 
     def init_device(self):
         if self.dev.is_locked():
@@ -51,7 +55,7 @@ class DeviceBase(DeviceRandomConfig):
             self.swipe_up_unlock()
             sleep(1.5)
         else:
-            print()
+            print("unlock")
 
     def swipe_up_unlock(self):
         screen_size = self.get_screen_size()
@@ -79,8 +83,8 @@ class DeviceBase(DeviceRandomConfig):
     def press_back(self):
         self.dev.keyevent("HOME")
 
-    def press_menu(self):
-        self.dev.keyevent("MENU")
+    def press_app_switch(self):
+        self.dev.keyevent("APP_SWITCH")
 
     def press_volume_up(self):
         self.dev.keyevent("VOLUME_UP")
@@ -185,7 +189,8 @@ class DeviceBase(DeviceRandomConfig):
             return element
         return None
 
-    def exist_by_image(self, image_path: str, threshold=0.75, timeout: float = 10) -> tuple[float, float] | None:
+    def exist_by_image(self, image_path: str, threshold=0.75, timeout: float = default_wait_view_timeout) -> tuple[
+                                                                                                                 float, float] | None:
         try:
             abs_path = str(Path(self.get_resource_path(image_path)).resolve())
             if not os.path.exists(abs_path):
@@ -243,7 +248,8 @@ class DeviceBase(DeviceRandomConfig):
                 return True
         return False
 
-    def click_by_image(self, image_path: str, threshold: float = 0.8, timeout: float = 10) -> bool:
+    def click_by_image(self, image_path: str, threshold: float = 0.8,
+                       timeout: float = default_wait_view_timeout) -> bool:
         position = self.exist_by_image(image_path, threshold=threshold, timeout=timeout)
         if position is not None:
             sleep(self.get_click_wait_time())
@@ -252,3 +258,31 @@ class DeviceBase(DeviceRandomConfig):
         # touch() 支持 timeout 参数
         # touch(template, timeout=timeout)
         return False
+
+    def swipe_up(self, level=1):
+        start_x = self._get_swipe_vertical_random_x()
+        start_y = self._get_swipe_vertical_random_y_start(is_up=True)
+        end_x = self._get_swipe_vertical_random_x()
+        end_y = self._get_swipe_vertical_random_y_end(is_up=True)
+        self.dev.swipe((start_x, start_y), (end_x, end_y), duration=self._get_swipe_random_duration())
+
+    def swipe_down(self, level=1):
+        start_x = self._get_swipe_vertical_random_x()
+        start_y = self._get_swipe_vertical_random_y_start(is_up=False)
+        end_x = self._get_swipe_vertical_random_x()
+        end_y = self._get_swipe_vertical_random_y_end(is_up=False)
+        self.dev.swipe((start_x, start_y), (end_x, end_y), duration=self._get_swipe_random_duration())
+
+    def swipe_left(self, level=1):
+        start_x = self._get_swipe_horizontal_random_x_start(True)
+        start_y = self._get_swipe_horizontal_random_y()
+        end_x = self._get_swipe_horizontal_random_x_end(True)
+        end_y = self._get_swipe_horizontal_random_y()
+        self.dev.swipe((start_x, start_y), (end_x, end_y), duration=self._get_swipe_random_duration())
+
+    def swipe_right(self, level=1):
+        start_x = self._get_swipe_horizontal_random_x_start(False)
+        start_y = self._get_swipe_horizontal_random_y()
+        end_x = self._get_swipe_horizontal_random_x_end(False)
+        end_y = self._get_swipe_horizontal_random_y()
+        self.dev.swipe((start_x, start_y), (end_x, end_y), duration=self._get_swipe_random_duration())

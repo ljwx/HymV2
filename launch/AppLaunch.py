@@ -6,13 +6,19 @@ from device.DeviceManager import DeviceManager
 
 
 class AppLaunch:
-    device: DeviceManager = DeviceManager(HwP40())
     packageInfo: AppPackageInfo = TestApp
 
     def __init__(self):
+        self.device = DeviceManager(Mi15())
         self.device.init_status()
         # self.launchApp()
-        self.test()
+        # self.device.swipe_down()
+        # self.test()
+        # self.device.press_app_switch()
+        # sleep(1)
+        # self.device.swipe_right()
+
+
 
     def launchApp(self):
         if not self.device.is_app_running(self.packageInfo.package_name):

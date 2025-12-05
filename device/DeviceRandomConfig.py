@@ -1,10 +1,15 @@
 import random
+from abc import abstractmethod, ABC
 
 
-class DeviceRandomConfig:
+class DeviceRandomConfig(ABC):
 
     def __init__(self, level: int = 1):
         self.duration_level = level
+
+    @abstractmethod
+    def get_screen_size(self) -> tuple[int, int]:
+        raise NotImplementedError()
 
     def _get_random_duration(self) -> float:
         return random.uniform(0.01, 0.1)
@@ -27,3 +32,48 @@ class DeviceRandomConfig:
         x = pos[0] + random.uniform(-8, 8)
         y = pos[1] + random.uniform(-8, 8)
         return x, y
+
+    def _get_swipe_vertical_random_x(self) -> float:
+        screen_size = self.get_screen_size()
+        width, height = screen_size
+        return width // random.uniform(1.5, 2.5)
+
+    def _get_swipe_vertical_random_y_start(self, is_up: bool) -> float:
+        screen_size = self.get_screen_size()
+        width, height = screen_size
+        if is_up:
+            return height * random.uniform(0.68, 0.83)
+        else:
+            return height * random.uniform(0.23, 0.38)
+
+    def _get_swipe_vertical_random_y_end(self, is_up: bool) -> float:
+        screen_size = self.get_screen_size()
+        width, height = screen_size
+        if is_up:
+            return height * random.uniform(0.23, 0.38)
+        else:
+            return height * random.uniform(0.68, 0.83)
+
+    def _get_swipe_horizontal_random_y(self) -> float:
+        screen_size = self.get_screen_size()
+        width, height = screen_size
+        return height // random.uniform(1.5, 2.5)
+
+    def _get_swipe_horizontal_random_x_start(self, is_left: bool) -> float:
+        screen_size = self.get_screen_size()
+        width, height = screen_size
+        if is_left:
+            return width * random.uniform(0.68, 0.83)
+        else:
+            return width * random.uniform(0.23, 0.38)
+
+    def _get_swipe_horizontal_random_x_end(self, is_left: bool) -> float:
+        screen_size = self.get_screen_size()
+        width, height = screen_size
+        if is_left:
+            return width * random.uniform(0.23, 0.38)
+        else:
+            return width * random.uniform(0.68, 0.83)
+
+    def _get_swipe_random_duration(self) -> float:
+        return random.uniform(0.15, 0.5)
