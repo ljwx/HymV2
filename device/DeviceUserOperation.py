@@ -1,5 +1,7 @@
 from typing import Callable, Any
 
+from poco.proxy import UIObjectProxy
+
 from device.DeviceBase import DeviceInfo
 from device.DeviceFindView import DeviceFindView
 from device.operation.UIOperation import UIOperation, Operation
@@ -9,19 +11,21 @@ class DeviceCommonOperation(DeviceFindView):
     def __init__(self, device_info: DeviceInfo):
         super().__init__(device_info)
 
-    def __dispatch_exist(self, source: str):
+    def __dispatch_exist(self, source: str) -> UIObjectProxy | tuple[float, float] | None:
         if source.__contains__("/resource/"):
             return self.exist_by_image(source)
         elif source.__contains__("com"):
             return self.exist_by_id(source)
         else:
             for i in range(0, 4):
-                if self.exist_by_text(source, 1):
-                    return True
+                tv = self.exist_by_text(source, 1)
+                if tv:
+                    return tv
                 else:
-                    if self.exist_by_desc(source, 1):
-                        return True
-        return False
+                    decs = self.exist_by_desc(source, 1)
+                    if decs:
+                        return decs
+        return None
 
     def __dispatch_click(self, source: str) -> bool:
         if source.__contains__("/resource/"):
@@ -60,6 +64,10 @@ class DeviceCommonOperation(DeviceFindView):
             result = self.__dispatch_click(ui.ui_tag)
         if op is Operation.Exist:
             result = self.__dispatch_exist(ui.ui_tag)
+        if op is Operation.Exist_Click:
+            exist = self.__dispatch_exist(ui.exist_tag)
+            if exist:
+                result = self.__dispatch_click(ui.ui_tag)
         if op is Operation.Back:
             self.press_back()
             result = True
