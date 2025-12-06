@@ -11,33 +11,33 @@ class DeviceCommonOperation(DeviceFindView):
     def __init__(self, device_info: DeviceInfo):
         super().__init__(device_info)
 
-    def __dispatch_exist(self, source: str) -> UIObjectProxy | tuple[float, float] | None:
+    def __dispatch_exist(self, source: str, timeout: int) -> UIObjectProxy | tuple[float, float] | None:
         if source.__contains__("/resource/"):
-            return self.exist_by_image(source)
+            return self.exist_by_image(source, timeout)
         elif source.__contains__("com"):
-            return self.exist_by_id(source)
+            return self.exist_by_id(source, timeout)
         else:
-            for i in range(0, 4):
-                tv = self.exist_by_text(source, 1)
+            for i in range(0, timeout):
+                tv = self.exist_by_text(source, 0.5)
                 if tv:
                     return tv
                 else:
-                    decs = self.exist_by_desc(source, 1)
+                    decs = self.exist_by_desc(source, 0.5)
                     if decs:
                         return decs
         return None
 
-    def __dispatch_click(self, source: str) -> bool:
+    def __dispatch_click(self, source: str, timeout: int) -> bool:
         if source.__contains__("/resource/"):
-            return self.click_by_image(source)
+            return self.click_by_image(source, timeout)
         elif source.__contains__("com"):
-            return self.click_by_id(source)
+            return self.click_by_id(source, timeout)
         else:
-            for i in range(0, 4):
-                if self.click_by_text(source, 1):
+            for i in range(0, timeout):
+                if self.click_by_text(source, 0.5):
                     return True
                 else:
-                    if self.click_by_desc(source, 1):
+                    if self.click_by_desc(source, 0.5):
                         return True
         return False
 
@@ -61,13 +61,13 @@ class DeviceCommonOperation(DeviceFindView):
         op = ui.operation
         result = True
         if op is Operation.Click:
-            result = self.__dispatch_click(ui.ui_tag)
+            result = self.__dispatch_click(ui.ui_tag, ui.timeout)
         if op is Operation.Exist:
-            result = self.__dispatch_exist(ui.ui_tag)
+            result = self.__dispatch_exist(ui.ui_tag, ui.timeout)
         if op is Operation.Exist_Click:
-            exist = self.__dispatch_exist(ui.exist_tag)
+            exist = self.__dispatch_exist(ui.exist_tag, ui.timeout)
             if exist:
-                result = self.__dispatch_click(ui.ui_tag)
+                result = self.__dispatch_click(ui.ui_tag, ui.timeout)
         if op is Operation.Back:
             self.press_back()
             result = True

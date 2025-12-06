@@ -1,4 +1,5 @@
 import random
+import time
 from abc import abstractmethod, ABC
 
 
@@ -10,6 +11,13 @@ class DeviceRandomConfig(ABC):
     @abstractmethod
     def get_screen_size(self) -> tuple[int, int]:
         raise NotImplementedError()
+
+    def sleep_operation_random(self):
+        time.sleep(random.uniform(0.5, 3.5))
+
+    def sleep_task_random(self, duration: float):
+        diff = duration * 0.2
+        time.sleep(random.uniform(duration, duration + diff))
 
     def _get_random_duration(self) -> float:
         return random.uniform(0.01, 0.1)
