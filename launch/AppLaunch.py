@@ -11,7 +11,10 @@ class AppLaunch:
         self.device = DeviceManager(Mi15())
         self.device.init_status()
         for app in self.get_apps():
-            app.launch_app()
+            try:
+                app.launch_app()
+            except Exception as e:
+                print(e)
 
     def clean_dialog(self):
         sleep(3)

@@ -235,6 +235,7 @@ class DeviceBase(DeviceRandomConfig):
         if element is not None:
             sleep(self.get_click_wait_time())
             result = element.click(focus=self.get_click_position_offset())
+            Log.d_view_click(text + ",click:" + str(result))
             if result is None or result:
                 return True
         return False

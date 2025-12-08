@@ -12,7 +12,7 @@ class DeviceCommonOperation(DeviceFindView):
         super().__init__(device_info)
 
     def __dispatch_exist(self, source: str, timeout: int) -> UIObjectProxy | tuple[float, float] | None:
-        if source.__contains__("/resource/"):
+        if source.lower().endswith(".png") or source.lower().endswith(".jpg") or source.lower().endswith(".jpeg"):
             return self.exist_by_image(source, timeout)
         elif source.__contains__("com"):
             return self.exist_by_id(source, timeout)
@@ -80,4 +80,10 @@ class DeviceCommonOperation(DeviceFindView):
             if isinstance(arg, UIOperation):
                 if not self.__handle_operation(arg):
                     return False
+        return True
+
+    def ui_operation_2d_array(self, list: list[list]) -> bool:
+        for inner_list in list:
+            if not self.ui_operation_sequence(*inner_list):
+                return False
         return True
