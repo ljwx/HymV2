@@ -1,3 +1,4 @@
+from time import sleep
 from typing import Callable, Any
 
 from poco.proxy import UIObjectProxy
@@ -27,17 +28,17 @@ class DeviceCommonOperation(DeviceFindView):
                         return decs
         return None
 
-    def __dispatch_click(self, source: str, timeout: int) -> bool:
+    def __dispatch_click(self, source: str, timeout: int, double_check: bool = False) -> bool:
         if source.__contains__("/resource/"):
-            return self.click_by_image(source, timeout)
+            return self.click_by_image(source, timeout=timeout)
         elif source.__contains__("com"):
-            return self.click_by_id(source, timeout)
+            return self.click_by_id(source, timeout, double_check)
         else:
             for i in range(0, timeout):
-                if self.click_by_text(source, 0.5):
+                if self.click_by_text(source, 0.5, double_check):
                     return True
                 else:
-                    if self.click_by_desc(source, 0.5):
+                    if self.click_by_desc(source, 0.5, double_check):
                         return True
         return False
 
@@ -61,13 +62,21 @@ class DeviceCommonOperation(DeviceFindView):
         op = ui.operation
         result = True
         if op is Operation.Click:
-            result = self.__dispatch_click(ui.ui_tag, ui.timeout)
+            result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout)
+        if op is Operation.Click_Double:
+            result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout, True)
         if op is Operation.Exist:
-            result = self.__dispatch_exist(ui.ui_tag, ui.timeout)
+            result = self.__dispatch_exist(ui.operation_ui_flag, ui.exist_timeout)
         if op is Operation.Exist_Click:
-            exist = self.__dispatch_exist(ui.exist_tag, ui.timeout)
+            exist = self.__dispatch_exist(ui.sub_exist_flag, ui.exist_timeout)
             if exist:
-                result = self.__dispatch_click(ui.ui_tag, ui.timeout)
+                result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout)
+        if op is Operation.Exist_Wait_Click:
+            exist = self.__dispatch_exist(ui.sub_exist_flag, ui.exist_timeout)
+            if exist:
+                waite_time = 25 if ui.exist_waite_time is None else ui.exist_waite_time
+                self.sleep_task_random(waite_time)
+                result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout)
         if op is Operation.Back:
             self.press_back()
             result = True

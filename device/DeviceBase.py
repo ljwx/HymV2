@@ -212,39 +212,49 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists(f"图片异常: {image_path}, 错误: {str(e)}, 详情: {error_detail}")
             return None
 
-    def click_by_id(self, resource_id: str, timeout=default_wait_view_timeout) -> bool:
+    def click_by_id(self, resource_id: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
         element = self.exist_by_id(resource_id, timeout=timeout)
         if element is not None:
             sleep(self.get_click_wait_time())
             result = element.click(focus=self.get_click_position_offset())
+            if double_check:
+                element.click(focus=self.get_click_position_offset())
+            Log.d_view_click(resource_id + ",click:" + str(result))
             if result is None or result:
                 return True
         return False
 
-    def click_by_name(self, name: str, timeout=default_wait_view_timeout) -> bool:
+    def click_by_name(self, name: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
         element = self.exist_by_name(name, timeout=timeout)
         if element is not None:
             sleep(self.get_click_wait_time())
             result = element.click(focus=self.get_click_position_offset())
+            if double_check:
+                element.click(focus=self.get_click_position_offset())
             if result is None or result:
                 return True
         return False
 
-    def click_by_text(self, text: str, timeout=default_wait_view_timeout) -> bool:
+    def click_by_text(self, text: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
         element = self.exist_by_text(text, timeout=timeout)
         if element is not None:
             sleep(self.get_click_wait_time())
             result = element.click(focus=self.get_click_position_offset())
+            if double_check:
+                element.click(focus=self.get_click_position_offset())
             Log.d_view_click(text + ",click:" + str(result))
             if result is None or result:
                 return True
         return False
 
-    def click_by_desc(self, desc: str, timeout=default_wait_view_timeout) -> bool:
+    def click_by_desc(self, desc: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
         element = self.exist_by_desc(desc, timeout=timeout)
         if element is not None:
             sleep(self.get_click_wait_time())
             result = element.click(focus=self.get_click_position_offset())
+            if double_check:
+                element.click(focus=self.get_click_position_offset())
+            Log.d_view_click(desc + ",click:" + str(result))
             if result is None or result:
                 return True
         return False

@@ -83,19 +83,29 @@ class DeviceFindView(DeviceBase):
         height = abs(ui_size[1] - info_size[1]) < size_diff
         return width and height
 
+    def __position_match(self, screen_position: tuple[float, float], target_position: tuple[float, float]) -> bool:
+        position_diff = 0.09
+        x = abs(screen_position[0] - target_position[0]) < position_diff
+        y = abs(screen_position[1] - target_position[1]) < position_diff
+        return x and y
+
     def find_ui_by_info(self, ui_info: UITargetInfo, timeout=3) -> UIObjectProxy | None:
         types = self.poco(type=ui_info.ui_name).wait(timeout=timeout)
         for type in types:
             size_match = True
+            position_match = True
             parent_match = True
             if ui_info.size is not None:
                 if not self.__size_match(type.get_size(), ui_info.size):
                     size_match = False
+            if ui_info.position is not None:
+                if not self.__position_match(type.get_position(), ui_info.position):
+                    position_match = False
             if ui_info.parent_name is not None:
                 parent = types.parent()
                 if not parent.exists() or not parent.get_name() == ui_info.parent_name:
                     parent_match = False
-            if size_match and parent_match:
+            if size_match and position_match and parent_match:
                 return type
         return None
 

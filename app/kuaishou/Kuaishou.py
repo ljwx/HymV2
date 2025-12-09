@@ -2,12 +2,14 @@ from time import sleep
 
 from app.AppRunProtocol import AppRunProtocol
 from apppackage.AppPackage import PackageInfoKuaiShou
+from constant.Const import ConstViewType
 from device.DeviceManager import DeviceManager
 from device.operation.UIOperation import UIOperation, Operation
+from device.uiview.UIInfo import UITargetInfo
 
 
 class KuaiShouApp(AppRunProtocol):
-    resource_dir = "kaishou/"
+    resource_dir = "kuaishou/"
     close_icon = resource_dir + "task_tab_page_close_icon.png"
 
     def __init__(self, device: DeviceManager):
@@ -35,7 +37,7 @@ class KuaiShouApp(AppRunProtocol):
         pass
 
     def is_home_page(self) -> bool:
-        return self.device.exist_by_id("com.kuaishou.nebula:id/nasa_milano_progress_container") is not None
+        return self.device.exist_by_id("com.kuaishou.nebula:id/bottom_bar_container") is not None
 
     def go_task_page(self) -> bool:
         if self.device.click_by_text("去赚钱"):
@@ -44,25 +46,33 @@ class KuaiShouApp(AppRunProtocol):
             ad2 = UIOperation(False, Operation.Exist_Click, self.close_icon, "添加组件 金币领取不怕忘", 2)
             ad3 = UIOperation(False, Operation.Exist_Click, self.close_icon, "看内容领取金币", 2)
             ad4 = UIOperation(False, Operation.Exist_Click, self.close_icon, "去微信邀请好友", 2)
-            self.device.ui_operation_sequence(ad1, ad2, ad3, ad4)
-            self.sign_in()
+            # self.device.ui_operation_sequence(ad1, ad2, ad3, ad4)
+            # self.check_in()
             self.video_task()
+            # self.get_balance()
 
-    def sign_in(self) -> bool:
+    def check_in(self) -> bool:
         # 签到
-        if self.device.exist_by_text("今日签到可领"):  # 弹窗签到
-            if self.device.click_by_text("立即签到"):
-                sleep(2)
-                if self.device.exist_by_text("明日签到可领"):
-                    print("签到成功")
-                    self.sign_in_after_task()
-                    return True
-        if self.device.click_by_text("立即签到", 2):  # 主动签到
+        exist_click = UIOperation(True, Operation.Exist_Click_Double, "立即签到", "今日签到可领")
+        check_in_result = UIOperation(True, Operation.Exist, "明日签到可领", )
+        if self.device.ui_operation_sequence(exist_click, check_in_result):
+            print("签到成功")
+            return True
+        standby_check_in = UIOperation(True, Operation.Click, "立即签到", exist_timeout=2)
+        if self.device.ui_operation_sequence(standby_check_in):
             print("签到成功")
             return True
         return False
 
     def get_balance(self) -> str:
+        go_coin = UIOperation(True, Operation.Click, "我的金币")
+        go_success = UIOperation(True, Operation.Exist, "我的收益")
+        if self.device.ui_operation_sequence(go_coin, go_success):
+            ui = self.device.find_ui_by_info(
+                UITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898)))
+            if ui and ui.get_text():
+                print("获取的余额", ui.get_text())
+                return ui.get_text()
         return ""
 
     def sign_in_after_task(self):
@@ -78,20 +88,21 @@ class KuaiShouApp(AppRunProtocol):
         pass
 
     def video_task(self):
-        if self.device.click_by_text("看广告得金币", 4):
+        start_ad = UIOperation(True, Operation.Click, "看广告得金币", exist_timeout=4)
+        if self.device.ui_operation_sequence(start_ad):
             for i in range(0, 5):
-                if self.video_item():
-                    self.video_item()
+                if self.video_task_item():
+                    self.video_task_item()
         self.device.click_by_name("close_view", 5)
 
-    def video_item(self) -> bool:
+    def video_task_item(self) -> bool:
         # 单个视频任务
-        if self.device.exist_by_id("com.kuaishou.nebula.commercial_neo:id/video_countdown"):
-            self.device.sleep_task_random(30)
-            self.device.click_by_id("com.kuaishou.nebula.commercial_neo:id/video_countdown_end_icon", timeout=35)
-            self.device.sleep_operation_random()
-            if self.device.exist_by_text("领取额外金币", 2):
-                self.device.click_by_name("close_view", 1)
-            if self.device.click_by_text("领取奖励", timeout=3):
-                return True
-        return False
+        exist_waite_click = UIOperation(
+            True, Operation.Exist_Wait_Click,
+            "com.kuaishou.nebula.commercial_neo:id/video_countdown_end_icon",
+            "com.kuaishou.nebula.commercial_neo:id/video_countdown", exist_timeout=30)
+        extra_video_click = UIOperation(False, Operation.Click, "领取额外金币", exist_timeout=3)
+        close_video_page = UIOperation(False, Operation.Click, "close_view", exist_timeout=2)
+        receive_reward = UIOperation(True, Operation.Click, "领取奖励", exist_timeout=3)
+        result =  self.device.ui_operation_sequence(exist_waite_click, extra_video_click, close_video_page, receive_reward)
+        return result
