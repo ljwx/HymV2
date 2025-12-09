@@ -30,7 +30,11 @@ class KuaiShouApp(AppRunProtocol):
     def common_step(self):
         self.handle_dialog()
         if self.is_home_page():
-            self.go_task_page()
+            if self.go_task_page():
+                # self.check_in()
+                # self.video_task()
+                # self.get_balance()
+                self.get_consuming_reward()
 
     def handle_dialog(self):
         # self.device.ui_operation_sequence(UIOperation(False, Operation.Exist_Click, "","限时大红包", "邀请新用户"))
@@ -46,10 +50,8 @@ class KuaiShouApp(AppRunProtocol):
             ad2 = UIOperation(False, Operation.Exist_Click, self.close_icon, "添加组件 金币领取不怕忘", 2)
             ad3 = UIOperation(False, Operation.Exist_Click, self.close_icon, "看内容领取金币", 2)
             ad4 = UIOperation(False, Operation.Exist_Click, self.close_icon, "去微信邀请好友", 2)
-            # self.device.ui_operation_sequence(ad1, ad2, ad3, ad4)
-            # self.check_in()
-            self.video_task()
-            # self.get_balance()
+            return self.device.ui_operation_sequence(ad1, ad2, ad3, ad4)
+        return False
 
     def check_in(self) -> bool:
         # 签到
@@ -104,5 +106,14 @@ class KuaiShouApp(AppRunProtocol):
         extra_video_click = UIOperation(False, Operation.Click, "领取额外金币", exist_timeout=3)
         close_video_page = UIOperation(False, Operation.Click, "close_view", exist_timeout=2)
         receive_reward = UIOperation(True, Operation.Click, "领取奖励", exist_timeout=3)
-        result =  self.device.ui_operation_sequence(exist_waite_click, extra_video_click, close_video_page, receive_reward)
+        result = self.device.ui_operation_sequence(exist_waite_click, extra_video_click, close_video_page,
+                                                   receive_reward)
         return result
+
+    def get_consuming_reward(self):
+        ui_trigger = self.device.find_all_contain_text(ConstViewType.Button, "点可领", timeout=5)
+        if True or ui_trigger and ui_trigger.click():
+            ad = self.device.find_all_contain_text(ConstViewType.Button, "去看广告得最高", timeout=5)
+            if ad and ad.click():
+                self.video_task_item()
+            self.device.click_by_id("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder")  # 直播
