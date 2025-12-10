@@ -157,36 +157,52 @@ class DeviceBase(DeviceRandomConfig):
             return ""
 
     def exist_by_id(self, resource_id: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
-        element = self.poco(resourceId=resource_id).wait(timeout=timeout)
-        exist = element.exists()
-        Log.d_view_exists("id:" + resource_id + ",是否存在:" + str(exist))
-        if exist:
-            return element
-        return None
+        try:
+            element = self.poco(resourceId=resource_id).wait(timeout=timeout)
+            exist = element.exists()
+            Log.d_view_exists("id:" + resource_id + ",是否存在:" + str(exist))
+            if exist:
+                return element
+            return None
+        except Exception as e:
+            Log.d_view_exists("id:" + resource_id + "，异常：" + e)
+            return None
 
     def exist_by_name(self, resource_name: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
-        element = self.poco(name=resource_name).wait(timeout=timeout)
-        exist = element.exists()
-        Log.d_view_exists("name:" + resource_name + ",是否存在:" + str(exist))
-        if exist:
-            return element
-        return None
+        try:
+            element = self.poco(name=resource_name).wait(timeout=timeout)
+            exist = element.exists()
+            Log.d_view_exists("name:" + resource_name + ",是否存在:" + str(exist))
+            if exist:
+                return element
+            return None
+        except Exception as e:
+            Log.d_view_exists("name:" + resource_name + "，异常：" + e)
+            return None
 
     def exist_by_text(self, text: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
-        element = self.poco(text=text).wait(timeout=timeout)
-        exist = element.exists()
-        Log.d_view_exists("text:" + text + ",是否存在:" + str(exist))
-        if exist:
-            return element
-        return None
+        try:
+            element = self.poco(text=text).wait(timeout=timeout)
+            exist = element.exists()
+            Log.d_view_exists("text:" + text + ",是否存在:" + str(exist))
+            if exist:
+                return element
+            return None
+        except Exception as e:
+            Log.d_view_exists("text:" + text + "，异常：" + e)
+            return None
 
     def exist_by_desc(self, desc: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
-        element = self.poco(desc=desc).wait(timeout=timeout)
-        exist = element.exists()
-        Log.d_view_exists("desc:" + desc + ",是否存在:" + str(exist))
-        if exist:
-            return element
-        return None
+        try:
+            element = self.poco(desc=desc).wait(timeout=timeout)
+            exist = element.exists()
+            Log.d_view_exists("desc:" + desc + ",是否存在:" + str(exist))
+            if exist:
+                return element
+            return None
+        except Exception as e:
+            Log.d_view_exists("desc:" + desc + "，异常：" + e)
+            return None
 
     def exist_by_image(self, image_path: str, threshold=0.75, timeout: float = default_wait_view_timeout) -> tuple[
                                                                                                                  float, float] | None:

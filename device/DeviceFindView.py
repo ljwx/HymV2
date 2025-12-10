@@ -1,3 +1,5 @@
+import random
+
 from poco.proxy import UIObjectProxy
 
 from constant.Const import ConstViewType
@@ -130,4 +132,34 @@ class DeviceFindView(DeviceBase):
             if ui_text and text in ui_text:
                 print(ui_text)
                 return ui
+        return None
+
+    def find_list_by_flag(self, flag: str, timeout=3) -> UIObjectProxy | None:
+        if flag.__contains__("com."):
+            types = self.poco(name=flag).wait(timeout=timeout)
+            if types and len(types) > 0:
+                index = random.randint(0, len(types) - 1)
+                return types[index]
+        else:
+            types = self.poco(text=flag).wait(timeout=timeout)
+            if types and len(types) > 0:
+                index = random.randint(0, len(types) - 1)
+                return types[index]
+            else:
+                types = self.poco(desc=flag).wait(timeout=timeout)
+                if types and len(types) > 0:
+                    index = random.randint(0, len(types) - 1)
+                    return types[index]
+        return None
+
+    def find_list_by_child(self, flag: str, timeout=3) -> UIObjectProxy | None:
+        try:
+            parent = self.poco(resourceId=flag).wait(timeout=timeout)
+            if parent.exists():
+                children = parent.children()
+                if children and len(children) > 0:
+                    index = random.randint(0, len(children) - 1)
+                    return children[index]
+        except Exception as e:
+            print("查找子view异常", e)
         return None

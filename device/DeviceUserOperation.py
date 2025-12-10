@@ -66,7 +66,7 @@ class DeviceCommonOperation(DeviceFindView):
         result = True
         if op is Operation.Click:
             result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout)
-        if op is Operation.Random_Click:
+        if op is Operation.Random_Is_Click:
             if random.random() < 0.3:
                 self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout)
             result = True

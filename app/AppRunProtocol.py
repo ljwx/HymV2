@@ -24,8 +24,12 @@ class AppRunProtocol(ABC):
     @abstractmethod
     def get_balance(self) -> str: ...
 
-    @abstractmethod
-    def main_task_range(self): ...
+    def main_task_range(self):
+        self.device.task_operation.main_task_range(callback=lambda: (
+            self.main_task_item()
+        ))
 
     @abstractmethod
     def main_task_item(self): ...
+
+    def main_task_star(self):

@@ -11,7 +11,8 @@ class Operation(StrEnum):
     Exist_Wait_Click = "exist_wait_click"
     Swipe_Up_Mid = "swipe_up_mid"
     Wait = "wait"
-    Random_Click = "random_click"
+    Random_Is_Click = "random_click"
+    Child_Random_Click = "child_random_click"
 
 
 class UIOperation:

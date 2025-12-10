@@ -1,20 +1,24 @@
 from time import sleep
+from typing import Callable, Any
 
-from app.kuaishou.Kuaishou import KuaiShouApp
+from app.kuaishou.KuaiShouApp import KuaiShouApp
 from device.DeviceInfo import Mi15, HwP40
 from device.DeviceManager import DeviceManager
 
 
 class AppLaunch:
 
-    def __init__(self):
+    def __init__(self, callback: Callable[[DeviceManager], Any] | None = None):
         self.device = DeviceManager(Mi15())
         self.device.init_status()
         for app in self.get_apps():
             try:
-                app.launch_app()
+                if callback:
+                    callback(self.device)
+                else:
+                    app.launch_app()
             except Exception as e:
-                print(e)
+                print("运行异常", e)
 
     def clean_dialog(self):
         sleep(3)

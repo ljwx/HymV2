@@ -88,16 +88,19 @@ class KuaiShouApp(AppRunProtocol):
                 self.device.click_by_text("拒绝", timeout=4)  # 打开其他app
                 self.device.click_by_id("com.kuaishou.nebula.commercial_neo:id/video_countdown_end_icon", timeout=35)
 
-    def main_task_range(self):
-        self.device.task_operation.main_task_range(callback=lambda: (
-            self.main_task_item()
-        ))
-
     def main_task_item(self):
         exist = UIOperation(True, Operation.Exist, "com.kuaishou.nebula:id/like_element_click_layout", exist_timeout=4)
         wait = UIOperation(True, Operation.Wait, "", )
         swipe = UIOperation(True, Operation.Swipe_Up_Mid, "",
                             exist_timeout=self.device.task_operation.get_main_task_duration())
+        go_works_list = UIOperation(True, Operation.Click, "com.kuaishou.nebula:id/follow_avatar_view")
+        works_list_success = UIOperation(True, Operation.Exist, "com.kuaishou.nebula:id/profile_user_kwai_id")
+        works_list_item = "com.kuaishou.nebula:id/recycler_view"
+        shopping_ad_video = "com.kuaishou.nebula:id/ad_download_progress"
+        ask_ad_video = "com.kuaishou.nebula:id/plc_tv_biz_text"
+        live_video_text = "点击进入直播间"
+        long_video = "继续观看完整版" or "完整版"
+        picture_vidoe = "长图"
         if self.device.ui_operation_sequence(exist):
             self.device.ui_operation_sequence(wait, swipe)
 
@@ -129,3 +132,7 @@ class KuaiShouApp(AppRunProtocol):
             if ad and ad.click():
                 self.video_task_item()
             self.device.click_by_id("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder")  # 直播
+
+    def main_task_star(self):
+        thumbs_up = "com.kuaishou.nebula:id/like_icon"
+        comment = "com.kuaishou.nebula:id/comment_icon"
