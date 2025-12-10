@@ -29,12 +29,14 @@ class KuaiShouApp(AppRunProtocol):
 
     def common_step(self):
         self.handle_dialog()
+        # if self.is_home_page():
+        # if self.go_task_page():
+        # self.check_in()
+        # self.video_task()
+        # self.get_balance()
+        # self.get_consuming_reward()
         if self.is_home_page():
-            if self.go_task_page():
-                # self.check_in()
-                # self.video_task()
-                # self.get_balance()
-                self.get_consuming_reward()
+            self.main_task_range()
 
     def handle_dialog(self):
         # self.device.ui_operation_sequence(UIOperation(False, Operation.Exist_Click, "","限时大红包", "邀请新用户"))
@@ -86,8 +88,18 @@ class KuaiShouApp(AppRunProtocol):
                 self.device.click_by_text("拒绝", timeout=4)  # 打开其他app
                 self.device.click_by_id("com.kuaishou.nebula.commercial_neo:id/video_countdown_end_icon", timeout=35)
 
-    def loop_task(self):
-        pass
+    def main_task_range(self):
+        self.device.task_operation.main_task_range(callback=lambda: (
+            self.main_task_item()
+        ))
+
+    def main_task_item(self):
+        exist = UIOperation(True, Operation.Exist, "com.kuaishou.nebula:id/like_element_click_layout", exist_timeout=4)
+        wait = UIOperation(True, Operation.Wait, "", )
+        swipe = UIOperation(True, Operation.Swipe_Up_Mid, "",
+                            exist_timeout=self.device.task_operation.get_main_task_duration())
+        if self.device.ui_operation_sequence(exist):
+            self.device.ui_operation_sequence(wait, swipe)
 
     def video_task(self):
         start_ad = UIOperation(True, Operation.Click, "看广告得金币", exist_timeout=4)

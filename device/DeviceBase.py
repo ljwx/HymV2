@@ -1,10 +1,9 @@
 import os
 from pathlib import Path
 from time import sleep
-from typing import Any
 
 from airtest.core.android.android import Android
-from airtest.core.api import exists, touch, wait, click
+from airtest.core.api import wait
 from airtest.core.error import TargetNotFoundError
 from airtest.core.cv import Template
 from airtest.core.helper import G
@@ -12,7 +11,7 @@ from airtest.core.helper import G
 from poco.drivers.android.uiautomation import AndroidUiautomationPoco
 from poco.proxy import UIObjectProxy
 
-from device.DeviceRandomConfig import DeviceRandomConfig
+from device.config.DeviceRandomConfig import DeviceRandomConfig
 from device.DeviceInfo import DeviceInfo
 from logevent.DeviceRunningLog import DeviceRunningLog
 from logevent.Log import Log
@@ -276,6 +275,7 @@ class DeviceBase(DeviceRandomConfig):
         end_x = self._get_swipe_vertical_random_x()
         end_y = self._get_swipe_vertical_random_y_end(is_up=True)
         self.dev.swipe((start_x, start_y), (end_x, end_y), duration=self._get_swipe_random_duration())
+        Log.d_swipe("向上滑动")
 
     def swipe_down(self, level=1):
         start_x = self._get_swipe_vertical_random_x()

@@ -9,6 +9,9 @@ class Operation(StrEnum):
     Exist_Click = "exist_click"
     Exist_Click_Double = "exist_click_duble"
     Exist_Wait_Click = "exist_wait_click"
+    Swipe_Up_Mid = "swipe_up_mid"
+    Wait = "wait"
+    Random_Click = "random_click"
 
 
 class UIOperation:

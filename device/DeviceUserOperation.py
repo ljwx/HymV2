@@ -1,3 +1,4 @@
+import random
 from time import sleep
 from typing import Callable, Any
 
@@ -5,12 +6,14 @@ from poco.proxy import UIObjectProxy
 
 from device.DeviceBase import DeviceInfo
 from device.DeviceFindView import DeviceFindView
+from device.operation.TaskOperation import TaskOperation
 from device.operation.UIOperation import UIOperation, Operation
 
 
 class DeviceCommonOperation(DeviceFindView):
     def __init__(self, device_info: DeviceInfo):
         super().__init__(device_info)
+        self.task_operation = TaskOperation()
 
     def __dispatch_exist(self, source: str, timeout: int) -> UIObjectProxy | tuple[float, float] | None:
         if source.lower().endswith(".png") or source.lower().endswith(".jpg") or source.lower().endswith(".jpeg"):
@@ -63,6 +66,10 @@ class DeviceCommonOperation(DeviceFindView):
         result = True
         if op is Operation.Click:
             result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout)
+        if op is Operation.Random_Click:
+            if random.random() < 0.3:
+                self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout)
+            result = True
         if op is Operation.Click_Double:
             result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout, True)
         if op is Operation.Exist:
@@ -77,6 +84,13 @@ class DeviceCommonOperation(DeviceFindView):
                 waite_time = 25 if ui.exist_waite_time is None else ui.exist_waite_time
                 self.sleep_task_random(waite_time)
                 result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout)
+        if op is Operation.Swipe_Up_Mid:
+            self.swipe_up()
+            result = True
+        if op is Operation.Wait:
+            waite_time = 25 if ui.exist_waite_time is None else ui.exist_waite_time
+            self.sleep_task_random(waite_time)
+            return True
         if op is Operation.Back:
             self.press_back()
             result = True

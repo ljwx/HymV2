@@ -3,6 +3,7 @@ class Log:
 
     VIEW_EXISTS = "view_exists"
     VIEW_CLICK = "view_click"
+    SWIPE = "swipe"
 
     @classmethod
     def i(cls, tag: str, content: str):
@@ -23,3 +24,7 @@ class Log:
     @classmethod
     def d_view_click(cls, content: str):
         cls.d(cls.VIEW_CLICK, content)
+
+    @classmethod
+    def d_swipe(cls, content: str):
+        cls.d(cls.SWIPE, content)
