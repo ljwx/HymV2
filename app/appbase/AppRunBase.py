@@ -1,7 +1,11 @@
 import random
+import time
 import traceback
 from abc import ABC, abstractmethod
+from datetime import datetime
 from time import sleep
+
+from numpy.distutils.misc_util import fortran_ext_match
 
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
@@ -12,10 +16,10 @@ class AppRunBase(ABC):
     execute_ad_reward_probably = 0.5
 
     star_probable: float = 0.2
-    comment_probable: float = 0.2
+    comment_probable: float = 0.02
     works_probable: float = 0.2
 
-    test_main_task_times = 2
+    test_main_task_times = 4
 
     def __init__(self, app_info: AppPackageInfo, device: DeviceManager):
         self.app_info = app_info
@@ -23,18 +27,21 @@ class AppRunBase(ABC):
 
     def launch_app(self) -> bool:
         try:
+            self.logd("启动")
             # if not self.device.is_app_running(self.packageInfo.package_name):
             self.device.start_app(self.app_info.package_name)
             sleep(4)
             self.common_step()
             return True
         except Exception as e:
-            print("启动异常", e)
+            self.logd("启动异常", e)
             traceback.print_exc()
             return False
 
     def common_step(self) -> bool:
         first_check_in = random.random() < self.first_check_in_probably
+        self.logd("是否先签到", first_check_in)
+        self.logd("处理启动后弹窗")
         self.handle_lunch_dialog()
         if first_check_in and self.go_task_page():
             self.check_in()
@@ -42,8 +49,10 @@ class AppRunBase(ABC):
             self.main_task_loop()
         if not first_check_in and self.go_task_page():
             self.check_in()
+        self.logd("获取每段时间奖励")
         self.get_duration_reward()
         if random.random() < self.execute_ad_reward_probably and self.go_task_page():
+            self.logd("执行视频广告任务")
             for i in range(random.randint(1, 4)):
                 self.start_video_task()
 
@@ -64,11 +73,14 @@ class AppRunBase(ABC):
         ...
 
     def check_in(self) -> bool:
+        self.logd("准备签到")
         if not self.is_check_in():
-            balance = self.get_balance()
-            print(self.app_info.name, "余额", balance)
+            self.logd("现在执行签到")
             result = self.execute_check_in()
-            print(self.app_info.name, "签到结果", result)
+            self.logd("签到结果", result)
+            self.logd("去获取余额")
+            balance = self.get_balance()
+            self.logd("余额", balance)
             return result
         return False
 
@@ -80,12 +92,16 @@ class AppRunBase(ABC):
         ...
 
     def main_task_loop(self):
+        self.logd("开始主线任务")
+
         def task():
+            self.logd("开始单个任务")
             self.every_time_clear()
             self.main_task_item()
             star = random.random() < self.star_probable
             comment = random.random() < self.comment_probable
             works = random.random() < self.works_probable
+            self.device.sleep_operation_random()
             self.main_task_human(star, comment, works)
 
         self.device.task_operation.main_task_range(callback=lambda: task(), test_times=self.test_main_task_times)
@@ -113,3 +129,8 @@ class AppRunBase(ABC):
     @abstractmethod
     def every_time_clear(self):
         ...
+
+    def logd(self, *content):
+        now = datetime.now()
+        formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
+        print(formatted_time, self.app_info.name, content)

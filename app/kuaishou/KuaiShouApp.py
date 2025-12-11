@@ -12,6 +12,7 @@ from device.uiview.UIInfo import UITargetInfo
 class KuaiShouApp(AppRunCommon):
     app_info = AppInfoKuaiShou
     id_prefix = app_info.id_prefix
+    ad_id_prefix = app_info.ad_id_prefix
 
     # 回首页
     main_home_page_flag = id_prefix + "bottom_bar_container"
@@ -32,6 +33,12 @@ class KuaiShouApp(AppRunCommon):
         self.close_icon = self.resource_dir + "task_tab_page_close_icon.png"
 
     def handle_lunch_dialog(self):
+        if self.device.exist_by_text("邀请2个新用户必得"):
+            close_icon = self.device.find_ui_by_info(UITargetInfo(ConstViewType.Image, (0.0758, 0.0340), (0.5, 0.7003)))
+            if close_icon:
+                close_icon.click()
+        if self.device.exist_by_flag("朋友推荐", 1):
+            self.device.click_by_flag("com.kuaishou.nebula:id/close_btn", 2)
         # self.device.ui_operation_sequence(UIOperation(False, Operation.Exist_Click, "","限时大红包", "邀请新用户"))
         pass
 
@@ -50,15 +57,18 @@ class KuaiShouApp(AppRunCommon):
         return False
 
     def execute_check_in(self) -> bool:
-        # 签到
-        exist_click = UIOperation(True, Operation.Exist_Click_Double, "立即签到", "今日签到可领")
+        exist_click = UIOperation(True, Operation.Exist_Click, "今天", "今日签到可领")
         check_in_result = UIOperation(True, Operation.Exist, "明日签到可领", )
+        result = False
         if self.device.ui_operation_sequence(exist_click, check_in_result):
-            return True
+            result = True
         standby_check_in = UIOperation(True, Operation.Click, "立即签到", exist_timeout=2)
-        if self.device.ui_operation_sequence(standby_check_in):
-            return True
-        return False
+        if not result and self.device.ui_operation_sequence(standby_check_in):
+            result = True
+        if self.device.click_by_text("去看视频"):
+            self.reward_ad_video_item()
+        self.device.click_by_image(self.close_icon, timeout=2)
+        return result
 
     def get_balance(self) -> str | None:
         go_coin = UIOperation(True, Operation.Click, "我的金币")
@@ -91,9 +101,9 @@ class KuaiShouApp(AppRunCommon):
         picture_vidoe = "长图"
         if self.device.ui_operation_sequence(exist):
             real_waite = wait
-            if (self.device.exist_by_flag(shopping_ad_video, 2)
-                    or self.device.exist_by_flag(ask_ad_video, 1)
-                    or self.device.exist_by_flag(live_video_text, 1)):
+            if (self.device.exist_by_flag(shopping_ad_video, 1)
+                    or self.device.exist_by_flag(ask_ad_video, 0.5)
+                    or self.device.exist_by_flag(live_video_text, 0.5)):
                 real_waite = ad_wait
             elif self.device.exist_by_flag(long_video1, 1) or self.device.exist_by_flag(long_video2, 1):
                 real_waite = movie_wait
@@ -115,14 +125,13 @@ class KuaiShouApp(AppRunCommon):
                     execute()
 
     def reward_ad_video_item(self) -> bool:
-        close_flag = self.id_prefix + "video_countdown_end_icon"
+        close_flag = self.ad_id_prefix + "video_countdown_end_icon"
         exist_waite_click = UIOperation(
             True, Operation.Exist_Wait_Click,
             close_flag,
-            self.id_prefix + "video_countdown",
+            self.ad_id_prefix + "video_countdown",
             exist_timeout=self.device.task_operation.get_video_ad_duration(28))
         second_video_flag = "领取奖励"
-        other_video_flag = "领取额外金币"  # 打开app
 
         def wait_and_finish() -> bool:
             return self.device.ui_operation_sequence(exist_waite_click)
@@ -132,6 +141,8 @@ class KuaiShouApp(AppRunCommon):
             if self.device.click_by_flag(second_video_flag):
                 self.device.sleep_task_random(3)
                 wait_and_finish()
+        if self.device.exist_by_flag("领取额外金币"):  # 打开app
+            self.device.click_by_name("close_view")
         self.device.click_by_flag(self.close_icon, timeout=3)
         self.device.click_by_flag(close_flag, timeout=1)
         self.device.click_by_flag(self.close_icon, timeout=1)

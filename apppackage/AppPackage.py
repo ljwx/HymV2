@@ -7,5 +7,5 @@ class AppPackageInfo:
         self.ad_id_prefix = ad_id_prefix
 
 
-AppInfoKuaiShou = AppPackageInfo("ks", "com.kuaishou.nebula", "1.0.0",
+AppInfoKuaiShou = AppPackageInfo("kuaishou", "com.kuaishou.nebula", "1.0.0",
                                  ad_id_prefix="com.kuaishou.nebula.commercial_neo:id/")

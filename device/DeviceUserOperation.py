@@ -33,7 +33,7 @@ class DeviceCommonOperation(DeviceFindView):
         return None
 
     def __dispatch_click(self, source: str, timeout: int, double_check: bool = False) -> bool:
-        if source.__contains__("/resource/"):
+        if source.lower().endswith(".png") or source.lower().endswith(".jpg") or source.lower().endswith(".jpeg"):
             return self.click_by_image(source, timeout=timeout)
         elif source.__contains__("com"):
             return self.click_by_id(source, timeout, double_check)
@@ -85,6 +85,10 @@ class DeviceCommonOperation(DeviceFindView):
                 waite_time = 25 if ui.exist_waite_time is None else ui.exist_waite_time
                 self.sleep_task_random(waite_time)
                 result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout)
+        if op is Operation.Exist_Click_Double:
+            exist = self.__dispatch_exist(ui.sub_exist_flag, ui.exist_timeout)
+            if exist:
+                result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout, True)
         if op is Operation.Swipe_Up_Mid:
             self.swipe_up()
             result = True

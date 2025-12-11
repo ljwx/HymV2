@@ -9,13 +9,13 @@ from device.DeviceManager import DeviceManager
 
 class AppLaunch:
 
-    def __init__(self, callback: Callable[[DeviceManager], Any] | None = None):
+    def __init__(self, callback: Callable[[DeviceManager, KuaiShouApp], Any] | None = None):
         self.device = DeviceManager(Mi15())
         self.device.init_status()
         for app in self.get_apps():
             try:
                 if callback:
-                    callback(self.device)
+                    callback(self.device, app)
                 else:
                     app.launch_app()
             except Exception as e:

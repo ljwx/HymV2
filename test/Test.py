@@ -1,12 +1,15 @@
+from app.kuaishou.KuaiShouApp import KuaiShouApp
+from constant.Const import ConstViewType
 from device.DeviceManager import DeviceManager
+from device.uiview.UIInfo import UITargetInfo
 from launch.AppLaunch import AppLaunch
 
 
-def test_run(device: DeviceManager):
-    view = device.exist_by_text("任务中心")
+def test_run(device: DeviceManager, app: KuaiShouApp):
+    app.go_task_page()
     # if view:
     #     view.click()
 
 
-# AppLaunch(callback=lambda device: test_run(device))
-AppLaunch()
+AppLaunch(callback=lambda device, app: test_run(device, app))
+# AppLaunch()

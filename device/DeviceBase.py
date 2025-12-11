@@ -238,7 +238,7 @@ class DeviceBase(DeviceRandomConfig):
                 return True
         else:
             if not self.exist_by_text(flag, timeout=timeout):
-                if self.exist_by_desc(flag, timeout=1):
+                if self.exist_by_desc(flag, timeout=0.5):
                     return True
             else:
                 return True
@@ -276,7 +276,7 @@ class DeviceBase(DeviceRandomConfig):
         position = self.exist_by_image(image_path, threshold=threshold, timeout=timeout)
         if position is not None:
             sleep(self.get_click_wait_time())
-            self.dev.touch(pos=self.get_touch_position_offset(), duration=self.get_touch_duration())
+            self.dev.touch(pos=self.get_touch_position_offset(position), duration=self.get_touch_duration())
             return True
         # touch() 支持 timeout 参数
         # touch(template, timeout=timeout)
