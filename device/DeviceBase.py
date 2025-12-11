@@ -81,7 +81,7 @@ class DeviceBase(DeviceRandomConfig):
 
     def press_back(self):
         self.dev.keyevent("BACK")
-        sleep(self.sleep_operation_random())
+        self.sleep_operation_random()
 
     def press_app_switch(self):
         self.dev.keyevent("APP_SWITCH")
