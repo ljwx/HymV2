@@ -6,6 +6,7 @@ from poco.proxy import UIObjectProxy
 
 from device.DeviceBase import DeviceInfo
 from device.DeviceFindView import DeviceFindView
+from device.config.TaskRandomConfig import TaskRandomConfig
 from device.operation.TaskOperation import TaskOperation
 from device.operation.UIOperation import UIOperation, Operation
 

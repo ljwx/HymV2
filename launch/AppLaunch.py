@@ -1,3 +1,4 @@
+import traceback
 from time import sleep
 from typing import Callable, Any
 
@@ -19,6 +20,7 @@ class AppLaunch:
                     app.launch_app()
             except Exception as e:
                 print("运行异常", e)
+                traceback.print_exc()
 
     def clean_dialog(self):
         sleep(3)

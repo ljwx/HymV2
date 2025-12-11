@@ -1,4 +1,5 @@
 import random
+import traceback
 from abc import ABC, abstractmethod
 from time import sleep
 
@@ -14,6 +15,8 @@ class AppRunBase(ABC):
     comment_probable: float = 0.2
     works_probable: float = 0.2
 
+    test_main_task_times = 2
+
     def __init__(self, app_info: AppPackageInfo, device: DeviceManager):
         self.app_info = app_info
         self.device = device
@@ -27,6 +30,7 @@ class AppRunBase(ABC):
             return True
         except Exception as e:
             print("启动异常", e)
+            traceback.print_exc()
             return False
 
     def common_step(self) -> bool:
@@ -34,19 +38,21 @@ class AppRunBase(ABC):
         self.handle_lunch_dialog()
         if first_check_in and self.go_task_page():
             self.check_in()
-        if self.go_main_home_page():
+        if self.go_main_home_page(select_tab=True):
             self.main_task_loop()
         if not first_check_in and self.go_task_page():
             self.check_in()
+        self.get_duration_reward()
         if random.random() < self.execute_ad_reward_probably and self.go_task_page():
-            self.reward_ad_video_item()
+            for i in range(random.randint(1, 4)):
+                self.start_video_task()
 
     @abstractmethod
     def handle_lunch_dialog(self):
         ...
 
     @abstractmethod
-    def go_main_home_page(self) -> bool:
+    def go_main_home_page(self, select_tab: bool = False) -> bool:
         ...
 
     @abstractmethod
@@ -75,13 +81,14 @@ class AppRunBase(ABC):
 
     def main_task_loop(self):
         def task():
+            self.every_time_clear()
             self.main_task_item()
             star = random.random() < self.star_probable
             comment = random.random() < self.comment_probable
             works = random.random() < self.works_probable
             self.main_task_human(star, comment, works)
 
-        self.device.task_operation.main_task_range(callback=lambda: task())
+        self.device.task_operation.main_task_range(callback=lambda: task(), test_times=self.test_main_task_times)
 
     @abstractmethod
     def main_task_item(self):
@@ -92,11 +99,15 @@ class AppRunBase(ABC):
         ...
 
     @abstractmethod
+    def start_video_task(self):
+        ...
+
+    @abstractmethod
     def reward_ad_video_item(self) -> bool:
         ...
 
     @abstractmethod
-    def get_duration_reward(self):
+    def get_duration_reward(self) -> bool:
         ...
 
     @abstractmethod

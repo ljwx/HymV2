@@ -28,8 +28,8 @@ class DeviceRandomConfig(ABC):
     def get_touch_duration(self) -> float:
         return self.duration_level * self._get_random_duration()
 
-    def get_click_wait_time(self) -> float:
-        return self.duration_level * self._get_click_timeout()
+    def get_click_wait_time(self, level=1) -> float:
+        return level * self._get_click_timeout()
 
     def get_click_position_offset(self) -> tuple[float, float]:
         x = random.uniform(0.03, 0.97)

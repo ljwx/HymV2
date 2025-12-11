@@ -229,6 +229,21 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists(f"图片异常: {image_path}, 错误: {str(e)}, 详情: {error_detail}")
             return None
 
+    def exist_by_flag(self, flag: str, timeout: float = default_wait_view_timeout) -> bool:
+        if self.flag_is_id(flag):
+            if self.exist_by_id(flag, timeout=timeout):
+                return True
+        elif self.flag_is_image(flag):
+            if self.exist_by_image(flag, timeout=timeout):
+                return True
+        else:
+            if not self.exist_by_text(flag, timeout=timeout):
+                if self.exist_by_desc(flag, timeout=1):
+                    return True
+            else:
+                return True
+        return False
+
     def __execute_click(self, flag: str, element: UIObjectProxy | None, double_check: bool = False) -> bool:
         if element is not None:
             sleep(self.get_click_wait_time())
@@ -278,13 +293,22 @@ class DeviceBase(DeviceRandomConfig):
             else:
                 return True
 
+    def is_text_selected(self, text: str) -> bool:
+        ui = self.exist_by_text(text)
+        if ui:
+            selected = ui.attr("selected")
+            print(text, "是否选中", selected)
+            return selected
+        return False
+
     def swipe_up(self, level=1):
         start_x = self._get_swipe_vertical_random_x()
         start_y = self._get_swipe_vertical_random_y_start(is_up=True)
         end_x = self._get_swipe_vertical_random_x()
         end_y = self._get_swipe_vertical_random_y_end(is_up=True)
         self.dev.swipe((start_x, start_y), (end_x, end_y), duration=self._get_swipe_random_duration())
-        Log.d_swipe("向上滑动")
+        sleep(0.7)
+        Log.d_swipe("向上滑动:" + str(end_y - start_y))
 
     def swipe_down(self, level=1):
         start_x = self._get_swipe_vertical_random_x()
@@ -292,6 +316,8 @@ class DeviceBase(DeviceRandomConfig):
         end_x = self._get_swipe_vertical_random_x()
         end_y = self._get_swipe_vertical_random_y_end(is_up=False)
         self.dev.swipe((start_x, start_y), (end_x, end_y), duration=self._get_swipe_random_duration())
+        sleep(0.7)
+        Log.d_swipe("向下滑动:" + str(end_y - start_y))
 
     def swipe_left(self, level=1):
         start_x = self._get_swipe_horizontal_random_x_start(True)
