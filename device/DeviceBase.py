@@ -80,7 +80,8 @@ class DeviceBase(DeviceRandomConfig):
         self.dev.home()
 
     def press_back(self):
-        self.dev.keyevent("HOME")
+        self.dev.keyevent("BACK")
+        sleep(self.sleep_operation_random())
 
     def press_app_switch(self):
         self.dev.keyevent("APP_SWITCH")
@@ -156,14 +157,27 @@ class DeviceBase(DeviceRandomConfig):
         except Exception as e:
             return ""
 
-    def exist_by_id(self, resource_id: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
+    def flag_is_id(self, flag: str) -> bool:
+        return flag.startswith("com.")
+
+    def flag_is_image(self, flag: str) -> bool:
+        return flag.lower().endswith(".png") or flag.lower().endswith(".jpg") or flag.lower().endswith(".jpeg")
+
+    def __execute_exist_by_flag(self, flag: str, element: UIObjectProxy | None) -> UIObjectProxy | None:
         try:
-            element = self.poco(resourceId=resource_id).wait(timeout=timeout)
             exist = element.exists()
-            Log.d_view_exists("id:" + resource_id + ",是否存在:" + str(exist))
+            Log.d_view_exists(flag + ",是否存在:" + str(exist))
             if exist:
                 return element
             return None
+        except Exception as e:
+            Log.d_view_exists(flag + ",查找异常：" + e)
+            return None
+
+    def exist_by_id(self, resource_id: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
+        try:
+            element = self.poco(resourceId=resource_id).wait(timeout=timeout)
+            return self.__execute_exist_by_flag(resource_id, element)
         except Exception as e:
             Log.d_view_exists("id:" + resource_id + "，异常：" + e)
             return None
@@ -171,11 +185,7 @@ class DeviceBase(DeviceRandomConfig):
     def exist_by_name(self, resource_name: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
             element = self.poco(name=resource_name).wait(timeout=timeout)
-            exist = element.exists()
-            Log.d_view_exists("name:" + resource_name + ",是否存在:" + str(exist))
-            if exist:
-                return element
-            return None
+            return self.__execute_exist_by_flag(resource_name, element)
         except Exception as e:
             Log.d_view_exists("name:" + resource_name + "，异常：" + e)
             return None
@@ -183,11 +193,7 @@ class DeviceBase(DeviceRandomConfig):
     def exist_by_text(self, text: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
             element = self.poco(text=text).wait(timeout=timeout)
-            exist = element.exists()
-            Log.d_view_exists("text:" + text + ",是否存在:" + str(exist))
-            if exist:
-                return element
-            return None
+            return self.__execute_exist_by_flag(text, element)
         except Exception as e:
             Log.d_view_exists("text:" + text + "，异常：" + e)
             return None
@@ -195,11 +201,7 @@ class DeviceBase(DeviceRandomConfig):
     def exist_by_desc(self, desc: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
             element = self.poco(desc=desc).wait(timeout=timeout)
-            exist = element.exists()
-            Log.d_view_exists("desc:" + desc + ",是否存在:" + str(exist))
-            if exist:
-                return element
-            return None
+            return self.__execute_exist_by_flag(desc, element)
         except Exception as e:
             Log.d_view_exists("desc:" + desc + "，异常：" + e)
             return None
@@ -227,63 +229,54 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists(f"图片异常: {image_path}, 错误: {str(e)}, 详情: {error_detail}")
             return None
 
-    def click_by_id(self, resource_id: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
-        element = self.exist_by_id(resource_id, timeout=timeout)
+    def __execute_click(self, flag: str, element: UIObjectProxy | None, double_check: bool = False) -> bool:
         if element is not None:
             sleep(self.get_click_wait_time())
             result = element.click(focus=self.get_click_position_offset())
             if double_check:
                 element.click(focus=self.get_click_position_offset())
-            Log.d_view_click(resource_id + ",click:" + str(result))
+            Log.d_view_click(flag + ",click:" + str(result))
             if result is None or result:
                 return True
         return False
+
+    def click_by_id(self, resource_id: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
+        element = self.exist_by_id(resource_id, timeout=timeout)
+        return self.__execute_click(resource_id, element, double_check=double_check)
 
     def click_by_name(self, name: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
         element = self.exist_by_name(name, timeout=timeout)
-        if element is not None:
-            sleep(self.get_click_wait_time())
-            result = element.click(focus=self.get_click_position_offset())
-            if double_check:
-                element.click(focus=self.get_click_position_offset())
-            if result is None or result:
-                return True
-        return False
+        return self.__execute_click(name, element, double_check=double_check)
 
     def click_by_text(self, text: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
         element = self.exist_by_text(text, timeout=timeout)
-        if element is not None:
-            sleep(self.get_click_wait_time())
-            result = element.click(focus=self.get_click_position_offset())
-            if double_check:
-                element.click(focus=self.get_click_position_offset())
-            Log.d_view_click(text + ",click:" + str(result))
-            if result is None or result:
-                return True
-        return False
+        return self.__execute_click(text, element, double_check=double_check)
 
     def click_by_desc(self, desc: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
         element = self.exist_by_desc(desc, timeout=timeout)
-        if element is not None:
-            sleep(self.get_click_wait_time())
-            result = element.click(focus=self.get_click_position_offset())
-            if double_check:
-                element.click(focus=self.get_click_position_offset())
-            Log.d_view_click(desc + ",click:" + str(result))
-            if result is None or result:
-                return True
-        return False
+        return self.__execute_click(desc, element, double_check=double_check)
 
     def click_by_image(self, image_path: str, threshold: float = 0.8,
                        timeout: float = default_wait_view_timeout) -> bool:
         position = self.exist_by_image(image_path, threshold=threshold, timeout=timeout)
         if position is not None:
             sleep(self.get_click_wait_time())
-            self.dev.touch(position, duration=self.get_touch_duration())
+            self.dev.touch(pos=self.get_touch_position_offset(), duration=self.get_touch_duration())
             return True
         # touch() 支持 timeout 参数
         # touch(template, timeout=timeout)
         return False
+
+    def click_by_flag(self, flag: str, timeout=default_wait_view_timeout) -> bool:
+        if self.flag_is_id(flag):
+            return self.click_by_id(flag, timeout=timeout)
+        elif self.flag_is_image(flag):
+            return self.click_by_image(flag, timeout=timeout)
+        else:
+            if not self.click_by_text(flag, timeout=timeout):
+                return self.click_by_desc(flag, timeout=1)
+            else:
+                return True
 
     def swipe_up(self, level=1):
         start_x = self._get_swipe_vertical_random_x()

@@ -3,7 +3,7 @@ from launch.AppLaunch import AppLaunch
 
 
 def test_run(device: DeviceManager):
-    view = device.exist_by_id("com.kuaishou.nebula:id/plc_tv_biz_text")
+    view = device.press_back()
     # if view:
     #     view.click()
 

@@ -5,4 +5,4 @@ class AppPackageInfo:
         self.app_version = app_version
 
 
-PackageInfoKuaiShou = AppPackageInfo("ks", "com.kuaishou.nebula", "1.0.0")
+AppInfoKuaiShou = AppPackageInfo("ks", "com.kuaishou.nebula", "1.0.0")
