@@ -32,15 +32,20 @@ class DeviceBase(DeviceRandomConfig):
         super(DeviceBase, self).__init__(level=1)
         self.device_info = device_info
         print("开始连接")
-        self.dev = Android(serialno=device_info.serial_no)
-        # 将设备注册到 Airtest 全局设备管理器（poco 使用 use_airtest_input=True 时需要）
-        G.DEVICE = self.dev
-        self.poco = AndroidUiautomationPoco(
-            device=self.dev,
-            use_airtest_input=True,  # 启用Airtest输入（解决中文输入问题）
-            screenshot_each_action=False  # 关闭每次操作自动截图（提升速度）
-        )
-        self.init_device()
+        try:
+            self.dev = Android(serialno=device_info.serial_no)
+            # 将设备注册到 Airtest 全局设备管理器（poco 使用 use_airtest_input=True 时需要）
+            G.DEVICE = self.dev
+            self.poco = AndroidUiautomationPoco(
+                device=self.dev,
+                use_airtest_input=True,  # 启用Airtest输入（解决中文输入问题）
+                screenshot_each_action=False  # 关闭每次操作自动截图（提升速度）
+            )
+            self.init_device()
+            self.device_ready = True
+        except Exception as e:
+            self.logd("设备连接异常", e)
+        self.device_ready = False
 
     def get_screen_size(self) -> tuple[int, int]:
         if self.screen_size is None:
