@@ -5,31 +5,34 @@ from typing import Callable, Any
 from app.kuaishou.KuaiShouApp import KuaiShouApp
 from device.DeviceInfo import Mi15, HwP40
 from device.DeviceManager import DeviceManager
+from logevent.Log import Log
 
 
 class AppLaunch:
 
     def __init__(self, callback: Callable[[DeviceManager, KuaiShouApp], Any] | None = None):
-        self.device = DeviceManager(Mi15())
-        self.device.init_status()
-        for app in self.get_apps():
+        while (True):
+            try:
+                self.main_task(callback)
+            except Exception as e:
+                Log.d("未知异常", str(e))
+            sleep(60)
+
+    def main_task(self, callback: Callable[[DeviceManager, KuaiShouApp], Any] | None = None):
+        device = DeviceManager(Mi15())
+        if not device.device_ready:
+            Log.d("device", "设备异常")
+            return
+        device.init_status()
+        for app in self.get_apps(device):
             try:
                 if callback:
-                    callback(self.device, app)
+                    callback(device, app)
                 else:
                     app.launch_app()
             except Exception as e:
-                print("运行异常", e)
+                print("app运行异常", e)
                 traceback.print_exc()
 
-    def clean_dialog(self):
-        sleep(3)
-        self.device.press_back()
-        sleep(4)
-        self.device.press_back()
-
-    def test(self):
-        self.device.exist_by_image(image_path="test/kn_test.png")
-
-    def get_apps(self):
-        return [KuaiShouApp(device=self.device)]
+    def get_apps(self, device: DeviceManager):
+        return [KuaiShouApp(device=device)]
