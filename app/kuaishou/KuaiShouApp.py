@@ -49,9 +49,9 @@ class KuaiShouApp(AppRunCommon):
         if selected or self.device.click_by_text(tab_flag):
             sleep(4)
             ad1 = UIOperation(False, Operation.Exist_Click, self.close_icon, "瓜分百亿金币", 2)
-            ad2 = UIOperation(False, Operation.Exist_Click, self.close_icon, "添加组件 金币领取不怕忘", 2)
-            ad3 = UIOperation(False, Operation.Exist_Click, self.close_icon, "看内容领取金币", 2)
-            ad4 = UIOperation(False, Operation.Exist_Click, self.close_icon, "去微信邀请好友", 2)
+            ad2 = UIOperation(False, Operation.Exist_Click, self.close_icon, "添加组件 金币领取不怕忘", 1)
+            ad3 = UIOperation(False, Operation.Exist_Click, self.close_icon, "看内容领取金币", 1)
+            ad4 = UIOperation(False, Operation.Exist_Click, self.close_icon, "去微信邀请好友", 1)
             exist = UIOperation(True, Operation.Exist, "任务中心", exist_timeout=4)
             return self.device.ui_operation_sequence(ad1, ad2, ad3, ad4, exist)
         return False
@@ -85,29 +85,23 @@ class KuaiShouApp(AppRunCommon):
     def main_task_item(self):
         exist = UIOperation(True, Operation.Exist, self.app_info.id_prefix + "like_element_click_layout",
                             exist_timeout=4)
-        wait = UIOperation(True, Operation.Wait, "",
-                           exist_waite_time=self.device.task_operation.get_main_task_duration())
-        ad_wait = UIOperation(True, Operation.Wait, "",
-                              exist_waite_time=self.device.task_operation.get_main_task_duration_with_ad())
-        movie_wait = UIOperation(True, Operation.Wait, "",
-                                 exist_waite_time=self.device.task_operation.get_main_task_duration_with_movie())
         swipe = UIOperation(True, Operation.Swipe_Up_Mid, "",
                             exist_timeout=self.device.task_operation.get_main_task_duration())
-        shopping_ad_video = "com.kuaishou.nebula:id/ad_download_progress"
-        ask_ad_video = "com.kuaishou.nebula:id/plc_tv_biz_text"
+        shopping_ad_video = self.id_prefix + "ad_download_progress"
+        ask_ad_video = self.id_prefix + "plc_tv_biz_text"
         live_video_text = "点击进入直播间"
         long_video1 = "继续观看完整版"
         long_video2 = "完整版"
         picture_vidoe = "长图"
-        if self.device.ui_operation_sequence(exist):
-            real_waite = wait
-            if (self.device.exist_by_flag(shopping_ad_video, 1)
-                    or self.device.exist_by_flag(ask_ad_video, 0.5)
-                    or self.device.exist_by_flag(live_video_text, 0.5)):
-                real_waite = ad_wait
-            elif self.device.exist_by_flag(long_video1, 1) or self.device.exist_by_flag(long_video2, 1):
-                real_waite = movie_wait
-            self.device.ui_operation_sequence(real_waite, swipe)
+        ads = [shopping_ad_video, ask_ad_video]
+        lon = [long_video1, long_video2]
+        normal, duration = self.get_main_task_item_duration(ad_flag=ads, long_flag=lon)
+        if self.device.ui_operation_sequence(exist, 5):
+            wait = UIOperation(True, Operation.Wait, "", exist_waite_time=duration)
+            self.device.ui_operation_sequence(wait, swipe)
+        else:
+            self.device.swipe_up()
+        return normal
 
     def start_video_task(self):
         video_ad_enter = "看广告得金币"
@@ -130,7 +124,7 @@ class KuaiShouApp(AppRunCommon):
             True, Operation.Exist_Wait_Click,
             close_flag,
             self.ad_id_prefix + "video_countdown",
-            exist_timeout=self.device.task_operation.get_video_ad_duration(28))
+            exist_timeout=self.device.task_operation.get_video_ad_duration(33))
         second_video_flag = "领取奖励"
 
         def wait_and_finish() -> bool:
@@ -151,12 +145,19 @@ class KuaiShouApp(AppRunCommon):
     def get_duration_reward(self) -> bool:
         if not self.go_task_page():
             return False
-        ui_trigger = self.device.find_all_contain_text(ConstViewType.Button, "点可领", timeout=5)
-        if True or ui_trigger and ui_trigger.click():
+        trigger1 = self.device.find_all_contain_text(ConstViewType.Text, "金币立即领取", timeout=3)
+        if trigger1:
+            trigger1.click()
+            if self.device.exist_by_flag("任务完成奖励"):
+                self.device.click_by_flag(self.close_icon, timeout=2)
+        ui_trigger = self.device.find_all_contain_text(ConstViewType.Button, "点可领", timeout=2)
+        if ui_trigger:
+            ui_trigger.click()
             sleep(3)
             if random.random() < 0.5:
                 ad = self.device.find_all_contain_text(ConstViewType.Button, "去看广告得最高", timeout=5)
-                if ad and ad.click():
+                if ad:
+                    ad.click()
                     self.reward_ad_video_item()
                     self.device.click_by_id("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder")  # 直播
             else:

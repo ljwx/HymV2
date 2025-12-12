@@ -22,14 +22,13 @@ class DeviceCommonOperation(DeviceFindView):
         elif source.__contains__("com"):
             return self.exist_by_id(source, timeout)
         else:
-            for i in range(0, timeout):
-                tv = self.exist_by_text(source, 0.5)
-                if tv:
-                    return tv
-                else:
-                    decs = self.exist_by_desc(source, 0.5)
-                    if decs:
-                        return decs
+            tv = self.exist_by_text(source, timeout)
+            if tv:
+                return tv
+            else:
+                decs = self.exist_by_desc(source, 0.5)
+                if decs:
+                    return decs
         return None
 
     def __dispatch_click(self, source: str, timeout: int, double_check: bool = False) -> bool:
@@ -38,12 +37,11 @@ class DeviceCommonOperation(DeviceFindView):
         elif source.__contains__("com"):
             return self.click_by_id(source, timeout, double_check)
         else:
-            for i in range(0, timeout):
-                if self.click_by_text(source, 0.5, double_check):
+            if self.click_by_text(source, timeout, double_check):
+                return True
+            else:
+                if self.click_by_desc(source, 0.5, double_check):
                     return True
-                else:
-                    if self.click_by_desc(source, 0.5, double_check):
-                        return True
         return False
 
     def click_by_sequence(self, *args, on_fail: Callable[[], Any] | None = None) -> bool:

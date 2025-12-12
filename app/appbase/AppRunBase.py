@@ -12,13 +12,13 @@ from logevent.Log import Log
 
 class AppRunBase(ABC):
     first_check_in_probably = 0.3
-    execute_ad_reward_probably = 0.5
+    execute_ad_reward_probably = 0.9
 
-    star_probable: float = 0.5
-    comment_probable: float = 0.5
-    works_probable: float = 0.5
+    star_probable: float = 0.2
+    comment_probable: float = 0.2
+    works_probable: float = 0.6
 
-    test_main_task_times = 4
+    test_main_task_times = None
 
     def __init__(self, app_info: AppPackageInfo, device: DeviceManager):
         self.app_info = app_info
@@ -48,12 +48,16 @@ class AppRunBase(ABC):
             self.main_task_loop()
         if not first_check_in and self.go_task_page():
             self.check_in()
-        self.logd("获取每段时间奖励")
+        self.logd("===获取时间段奖励===")
         self.get_duration_reward()
+        self.logd("===时间段奖励结束===", "\\n")
         if random.random() < self.execute_ad_reward_probably and self.go_task_page():
-            self.logd("执行视频广告任务")
-            for i in range(random.randint(1, 4)):
+            times = random.randint(1, 4)
+            self.logd("执行视频广告任务", str(times), "次")
+            for i in range(times):
+                self.logd("===开始视频广告===")
                 self.start_video_task()
+                self.logd("===结束视频广告===", "\\n")
 
     @abstractmethod
     def handle_lunch_dialog(self):
@@ -72,7 +76,7 @@ class AppRunBase(ABC):
         ...
 
     def check_in(self) -> bool:
-        self.logd("准备签到")
+        self.logd("===准备签到===")
         if not self.is_check_in():
             self.logd("现在执行签到")
             result = self.execute_check_in()
@@ -80,6 +84,7 @@ class AppRunBase(ABC):
             self.logd("去获取余额")
             balance = self.get_balance()
             self.logd("余额", balance)
+            self.logd("===签到执行完毕===", "\\n")
             return result
         return False
 
@@ -94,19 +99,25 @@ class AppRunBase(ABC):
         self.logd("开始主线任务")
 
         def task():
-            self.logd("开始单个任务")
+            self.logd("====开始单个任务====")
             self.every_time_clear()
-            self.main_task_item()
-            star = random.random() < self.star_probable
-            comment = random.random() < self.comment_probable
-            works = random.random() < self.works_probable
+            is_normal = self.main_task_item()
+            star = (random.random() < self.star_probable) if is_normal else False
+            comment = (random.random() < self.comment_probable) if is_normal else False
+            works = (random.random() < self.works_probable) if is_normal else False
             self.device.sleep_operation_random()
             self.main_task_human(star, comment, works)
+            self.go_main_home_page()
+            self.logd("====结束单个任务====", "\\n")
 
         self.device.task_operation.main_task_range(callback=lambda: task(), test_times=self.test_main_task_times)
 
     @abstractmethod
-    def main_task_item(self):
+    def main_task_item(self) -> bool:
+        ...
+
+    @abstractmethod
+    def get_main_task_item_duration(self, ad_flag: list[str], long_flag: list[str]) -> tuple[bool, float]:
         ...
 
     @abstractmethod

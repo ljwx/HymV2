@@ -38,8 +38,25 @@ class AppRunCommon(AppRunBase):
                 self.device.press_back()
         return False
 
+    def get_main_task_item_duration(self, ad_flag: list[str], long_flag: list[str]) -> float:
+        sleep(1.5)
+        duration = self.device.task_operation.get_main_task_duration()
+        result = (True, duration)
+        for ad in ad_flag:
+            if self.device.exist_by_flag(ad, 0.3):
+                self.logd("当前主任务是广告")
+                duration = self.device.task_operation.get_video_ad_duration(1.2)
+                result = (False, duration)
+        for lon in long_flag:
+            if self.device.exist_by_flag(lon, 0.3):
+                self.logd("当前主任务是长视频")
+                duration = self.device.task_operation.get_main_task_duration_with_movie()
+                result = (True, duration)
+        self.logd("主任务item", result)
+        return result
+
     def main_task_human(self, star: bool, comment: bool, works: bool):
-        self.logd("模拟常规操作", star, comment, works)
+        self.logd("===模拟常规操作===", star, comment, works)
         go_works_list = UIOperation(True, Operation.Click, self.go_works_flag)
         works_list_success = UIOperation(True, Operation.Exist, self.works_success_flag)
         if star and self.star_flag:
@@ -57,11 +74,17 @@ class AppRunCommon(AppRunBase):
             if self.device.ui_operation_sequence(go_works_list, works_list_success):
                 for i in range(random.randint(1, 5)):
                     item = self.device.find_list_by_child(self.works_list_flag)
-                    if item:
-                        item.click()
-                        self.main_task_item()
-                        self.device.press_back()
+                    if item and item.exists():
+                        try:
+                           self.device.sleep_operation_random()
+                           item.click()
+                           self.main_task_item()
+                           self.device.press_back()
+                           self.device.sleep_operation_random()
+                        except Exception as e:
+                            self.logd("点击作品项失败，可能不在屏幕内", str(e))
                     self.device.swipe_up()
                     sleep(self.device.get_click_wait_time())
                 sleep(self.device.get_click_wait_time())
                 self.device.press_back()
+        self.logd("===常规操作结束===", "\n")

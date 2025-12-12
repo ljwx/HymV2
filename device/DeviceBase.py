@@ -338,5 +338,4 @@ class DeviceBase(DeviceRandomConfig):
     def logd(self, *content):
         now = datetime.now()
         formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
-        device_name = getattr(self.device_info, 'name', 'Device') if hasattr(self, 'device_info') else 'Device'
-        print(Log.filter, formatted_time, "[Device]", device_name, *content)
+        print(Log.filter, formatted_time, *content)
