@@ -1,5 +1,8 @@
+from datetime import datetime
+
+
 class Log:
-    __prefix = "hym_"
+    filter = "hym_run"
 
     VIEW_EXISTS = "view_exists"
     VIEW_CLICK = "view_click"
@@ -7,15 +10,21 @@ class Log:
 
     @classmethod
     def i(cls, tag: str, content: str):
-        print(tag, content)
+        now = datetime.now()
+        formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
+        print(Log.filter, formatted_time, tag, content)
 
     @classmethod
     def d(cls, tag: str, content: str):
-        print(tag, content)
+        now = datetime.now()
+        formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
+        print(Log.filter, formatted_time, tag, content)
 
     @classmethod
     def e(cls, tag: str, content: str):
-        print(tag, content)
+        now = datetime.now()
+        formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
+        print(Log.filter, formatted_time, tag, content)
 
     @classmethod
     def d_view_exists(cls, content: str):

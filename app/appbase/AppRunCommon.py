@@ -45,11 +45,15 @@ class AppRunCommon(AppRunBase):
         if star and self.star_flag:
             self.logd("点赞")
             self.device.click_by_flag(self.star_flag)
+            self.device.sleep_operation_random()
         if comment and self.comment_flag:
             self.logd("看评论")
             self.device.click_by_flag(self.comment_flag)
+            self.device.sleep_operation_random(3)
+            self.device.press_back()
+            self.device.sleep_operation_random()
         if works and self.go_works_flag:
-            self.logd("作品列表")
+            self.logd("去作品列表")
             if self.device.ui_operation_sequence(go_works_list, works_list_success):
                 for i in range(random.randint(1, 5)):
                     item = self.device.find_list_by_child(self.works_list_flag)

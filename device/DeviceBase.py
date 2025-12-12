@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from pathlib import Path
 from time import sleep
 
@@ -80,6 +81,7 @@ class DeviceBase(DeviceRandomConfig):
         self.dev.home()
 
     def press_back(self):
+        self.logd("点击返回键")
         self.dev.keyevent("BACK")
         self.sleep_operation_random()
 
@@ -114,12 +116,12 @@ class DeviceBase(DeviceRandomConfig):
             list = act_name.split("/.")
             if len(list) == 1:
                 list = act_name.split("/")
-            print("当前顶部activity", list)
+            self.logd("当前顶部activity", list)
             if len(list) == 2:
                 return list[0], list[1]
             return act_name, ""
         except Exception as e:
-            print(f"获取当前应用包名失败: {e}")
+            self.logd(f"获取当前应用包名失败: {e}")
             return "", ""
 
     def is_app_running(self, package_name: str) -> bool:
@@ -297,7 +299,7 @@ class DeviceBase(DeviceRandomConfig):
         ui = self.exist_by_text(text)
         if ui:
             selected = ui.attr("selected")
-            print(text, "是否选中", selected)
+            self.logd(text, "是否选中", selected)
             return selected
         return False
 
@@ -332,3 +334,9 @@ class DeviceBase(DeviceRandomConfig):
         end_x = self._get_swipe_horizontal_random_x_end(False)
         end_y = self._get_swipe_horizontal_random_y()
         self.dev.swipe((start_x, start_y), (end_x, end_y), duration=self._get_swipe_random_duration())
+
+    def logd(self, *content):
+        now = datetime.now()
+        formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
+        device_name = getattr(self.device_info, 'name', 'Device') if hasattr(self, 'device_info') else 'Device'
+        print(Log.filter, formatted_time, "[Device]", device_name, *content)

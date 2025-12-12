@@ -12,8 +12,9 @@ class DeviceRandomConfig(ABC):
     def get_screen_size(self) -> tuple[int, int]:
         raise NotImplementedError()
 
-    def sleep_operation_random(self):
-        time.sleep(random.uniform(0.5, 3.5))
+    def sleep_operation_random(self, times: int = 1):
+        for _ in range(times):
+            time.sleep(random.uniform(0.5, 3.5))
 
     def sleep_task_random(self, duration: float):
         diff = duration * 0.2
@@ -58,9 +59,9 @@ class DeviceRandomConfig(ABC):
         screen_size = self.get_screen_size()
         width, height = screen_size
         if is_up:
-            return height * random.uniform(0.23, 0.38)
+            return height * random.uniform(0.26, 0.38)
         else:
-            return height * random.uniform(0.68, 0.83)
+            return height * random.uniform(0.64, 0.76)
 
     def _get_swipe_horizontal_random_y(self) -> float:
         screen_size = self.get_screen_size()

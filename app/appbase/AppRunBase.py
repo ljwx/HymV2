@@ -5,19 +5,18 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from time import sleep
 
-from numpy.distutils.misc_util import fortran_ext_match
-
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
+from logevent.Log import Log
 
 
 class AppRunBase(ABC):
     first_check_in_probably = 0.3
     execute_ad_reward_probably = 0.5
 
-    star_probable: float = 0.2
-    comment_probable: float = 0.02
-    works_probable: float = 0.2
+    star_probable: float = 0.5
+    comment_probable: float = 0.5
+    works_probable: float = 0.5
 
     test_main_task_times = 4
 
@@ -133,4 +132,4 @@ class AppRunBase(ABC):
     def logd(self, *content):
         now = datetime.now()
         formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
-        print(formatted_time, self.app_info.name, content)
+        print(Log.filter, formatted_time, self.app_info.name, content)
