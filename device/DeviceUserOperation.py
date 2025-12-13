@@ -17,19 +17,14 @@ class DeviceCommonOperation(DeviceFindView):
         self.task_operation = TaskOperation()
 
     def __dispatch_exist(self, source: str, timeout: int) -> UIObjectProxy | tuple[float, float] | None:
-        if source.lower().endswith(".png") or source.lower().endswith(".jpg") or source.lower().endswith(".jpeg"):
+        if self.flag_is_image(source):
             return self.exist_by_image(source, timeout)
-        elif source.__contains__("com"):
+        elif self.flag_is_id(source):
             return self.exist_by_id(source, timeout)
+        elif self.flag_is_desc(source):
+            return self.exist_by_desc(source, timeout)
         else:
-            tv = self.exist_by_text(source, timeout)
-            if tv:
-                return tv
-            else:
-                decs = self.exist_by_desc(source, 0.5)
-                if decs:
-                    return decs
-        return None
+            return self.exist_by_text(source, timeout)
 
     def __dispatch_click(self, source: str, timeout: int, double_check: bool = False) -> bool:
         if source.lower().endswith(".png") or source.lower().endswith(".jpg") or source.lower().endswith(".jpeg"):
@@ -47,7 +42,7 @@ class DeviceCommonOperation(DeviceFindView):
     def click_by_sequence(self, *args, on_fail: Callable[[], Any] | None = None) -> bool:
         for arg in args:
             print(arg)
-            single = self.__dispatch_click(arg)
+            single = self.click_by_flag(arg)
             if not single:
                 if on_fail:
                     on_fail()
@@ -64,27 +59,27 @@ class DeviceCommonOperation(DeviceFindView):
         op = ui.operation
         result = True
         if op is Operation.Click:
-            result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout)
+            result = self.click_by_flag(ui.operation_ui_flag, ui.exist_timeout)
         if op is Operation.Random_Is_Click:
             if random.random() < 0.3:
-                self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout)
+                self.click_by_flag(ui.operation_ui_flag, ui.exist_timeout)
             result = True
         if op is Operation.Click_Double:
             result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout, True)
         if op is Operation.Exist:
-            result = self.__dispatch_exist(ui.operation_ui_flag, ui.exist_timeout)
+            result = self.exist_by_flag(ui.operation_ui_flag, ui.exist_timeout)
         if op is Operation.Exist_Click:
-            exist = self.__dispatch_exist(ui.sub_exist_flag, ui.exist_timeout)
+            exist = self.exist_by_flag(ui.sub_exist_flag, ui.exist_timeout)
             if exist:
-                result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout)
+                result = self.click_by_flag(ui.operation_ui_flag, ui.exist_timeout)
         if op is Operation.Exist_Wait_Click:
-            exist = self.__dispatch_exist(ui.sub_exist_flag, ui.exist_timeout)
+            exist = self.exist_by_flag(ui.sub_exist_flag, ui.exist_timeout)
             if exist:
                 waite_time = 25 if ui.exist_waite_time is None else ui.exist_waite_time
                 self.sleep_task_random(waite_time)
-                result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout)
+                result = self.click_by_flag(ui.operation_ui_flag, ui.exist_timeout)
         if op is Operation.Exist_Click_Double:
-            exist = self.__dispatch_exist(ui.sub_exist_flag, ui.exist_timeout)
+            exist = self.exist_by_flag(ui.sub_exist_flag, ui.exist_timeout)
             if exist:
                 result = self.__dispatch_click(ui.operation_ui_flag, ui.exist_timeout, True)
         if op is Operation.Swipe_Up_Mid:

@@ -6,7 +6,9 @@ from launch.AppLaunch import AppLaunch
 
 
 def test_run(device: DeviceManager, app: KuaiShouApp):
-    app.main_task_loop()
+    app.device.swipe_up()
+
+
     # if view:
     #     view.click()
 

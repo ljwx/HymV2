@@ -42,12 +42,15 @@ class AppRunBase(ABC):
         self.logd("是否先签到", first_check_in)
         self.logd("处理启动后弹窗")
         self.handle_lunch_dialog()
-        if first_check_in and self.go_task_page():
-            self.check_in()
+        def check_in() -> bool:
+            if not self.is_check_in() and self.go_task_page():
+                self.check_in()
+        if first_check_in:
+            check_in()
         if self.go_main_home_page(select_tab=True):
             self.main_task_loop()
-        if not first_check_in and self.go_task_page():
-            self.check_in()
+        if not first_check_in:
+            check_in()
         self.logd("===获取时间段奖励===")
         self.get_duration_reward()
         self.logd("===时间段奖励结束===", "\\n")
@@ -89,7 +92,7 @@ class AppRunBase(ABC):
         return False
 
     def is_check_in(self) -> bool:
-        return False
+        return True
 
     @abstractmethod
     def execute_check_in(self) -> bool:
@@ -117,7 +120,8 @@ class AppRunBase(ABC):
         ...
 
     @abstractmethod
-    def get_main_task_item_duration(self, ad_flag: list[str], long_flag: list[str]) -> tuple[bool, float]:
+    def get_main_task_item_duration(self, ad_flag: list[str], normal: list[str], long_flag: list[str]) -> tuple[
+        bool, float]:
         ...
 
     @abstractmethod

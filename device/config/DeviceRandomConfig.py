@@ -14,7 +14,7 @@ class DeviceRandomConfig(ABC):
 
     def sleep_operation_random(self, times: int = 1):
         for _ in range(times):
-            time.sleep(random.uniform(0.5, 3.5))
+            time.sleep(random.uniform(0.5, 2.5))
 
     def sleep_task_random(self, duration: float):
         diff = duration * 0.2

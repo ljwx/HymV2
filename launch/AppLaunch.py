@@ -16,7 +16,7 @@ class AppLaunch:
                 self.main_task(callback)
             except Exception as e:
                 Log.d("未知异常", str(e))
-            sleep(60)
+            sleep(10)
 
     def main_task(self, callback: Callable[[DeviceManager, KuaiShouApp], Any] | None = None):
         device = DeviceManager(Mi15())

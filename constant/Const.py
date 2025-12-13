@@ -8,3 +8,7 @@ class ConstViewType:
     Group = "android.widget.ViewGroup"
     Frame = "android.widget.FrameLayout"
     Recycler = "androidx.recyclerview.widget.RecyclerView"
+
+
+class ConstFlag:
+    Desc = "desc;"

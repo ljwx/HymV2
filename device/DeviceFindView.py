@@ -19,13 +19,6 @@ class DeviceFindView(DeviceBase):
             return position
         return None
 
-    def _get_position_by_name(self, name: str, timeout=10) -> tuple[float, float] | None:
-        if self.exist_by_name(name, timeout=timeout):
-            element = self.poco(name=name)
-            position = element.get_position()
-            return position
-        return None
-
     def _get_position_by_text(self, text: str, timeout=10) -> tuple[float, float] | None:
         if self.exist_by_text(text, timeout=timeout):
             element = self.poco(text=text)

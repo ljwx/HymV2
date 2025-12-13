@@ -12,6 +12,7 @@ from airtest.core.helper import G
 from poco.drivers.android.uiautomation import AndroidUiautomationPoco
 from poco.proxy import UIObjectProxy
 
+from constant.Const import ConstFlag
 from device.config.DeviceRandomConfig import DeviceRandomConfig
 from device.DeviceInfo import DeviceInfo
 from logevent.DeviceRunningLog import DeviceRunningLog
@@ -170,6 +171,9 @@ class DeviceBase(DeviceRandomConfig):
     def flag_is_image(self, flag: str) -> bool:
         return flag.lower().endswith(".png") or flag.lower().endswith(".jpg") or flag.lower().endswith(".jpeg")
 
+    def flag_is_desc(self, flag: str) -> bool:
+        return flag.startswith(ConstFlag.Desc)
+
     def __execute_exist_by_flag(self, flag: str, element: UIObjectProxy | None) -> UIObjectProxy | None:
         try:
             exist = element.exists()
@@ -184,22 +188,20 @@ class DeviceBase(DeviceRandomConfig):
     def exist_by_id(self, resource_id: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
             element = self.poco(resourceId=resource_id).wait(timeout=timeout)
+            if len(element) > 1:
+                for i in element:
+                    self.logd("多个:" + resource_id, i.get_position())
             return self.__execute_exist_by_flag(resource_id, element)
         except Exception as e:
             Log.d_view_exists("id:" + resource_id + "，异常：" + e)
             return None
 
-    def exist_by_name(self, resource_name: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
-        try:
-            element = self.poco(name=resource_name).wait(timeout=timeout)
-            return self.__execute_exist_by_flag(resource_name, element)
-        except Exception as e:
-            Log.d_view_exists("name:" + resource_name + "，异常：" + e)
-            return None
-
     def exist_by_text(self, text: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
             element = self.poco(text=text).wait(timeout=timeout)
+            if len(element) > 1:
+                for i in element:
+                    self.logd("多个:" + text, i.get_position())
             return self.__execute_exist_by_flag(text, element)
         except Exception as e:
             Log.d_view_exists("text:" + text + "，异常：" + e)
@@ -208,6 +210,9 @@ class DeviceBase(DeviceRandomConfig):
     def exist_by_desc(self, desc: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
             element = self.poco(desc=desc).wait(timeout=timeout)
+            if len(element) > 1:
+                for i in element:
+                    self.logd("多个desc:" + desc, i.get_position())
             return self.__execute_exist_by_flag(desc, element)
         except Exception as e:
             Log.d_view_exists("desc:" + desc + "，异常：" + e)
@@ -243,11 +248,11 @@ class DeviceBase(DeviceRandomConfig):
         elif self.flag_is_image(flag):
             if self.exist_by_image(flag, timeout=timeout):
                 return True
+        elif self.flag_is_desc(flag):
+            if self.exist_by_desc(flag, timeout=timeout):
+                return True
         else:
-            if not self.exist_by_text(flag, timeout=timeout):
-                if self.exist_by_desc(flag, timeout=0.5):
-                    return True
-            else:
+            if self.exist_by_text(flag, timeout=timeout):
                 return True
         return False
 
@@ -265,10 +270,6 @@ class DeviceBase(DeviceRandomConfig):
     def click_by_id(self, resource_id: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
         element = self.exist_by_id(resource_id, timeout=timeout)
         return self.__execute_click(resource_id, element, double_check=double_check)
-
-    def click_by_name(self, name: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
-        element = self.exist_by_name(name, timeout=timeout)
-        return self.__execute_click(name, element, double_check=double_check)
 
     def click_by_text(self, text: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
         element = self.exist_by_text(text, timeout=timeout)
@@ -294,11 +295,10 @@ class DeviceBase(DeviceRandomConfig):
             return self.click_by_id(flag, timeout=timeout)
         elif self.flag_is_image(flag):
             return self.click_by_image(flag, timeout=timeout)
+        elif self.flag_is_desc(flag):
+            return self.click_by_desc(flag, timeout=timeout)
         else:
-            if not self.click_by_text(flag, timeout=timeout):
-                return self.click_by_desc(flag, timeout=1)
-            else:
-                return True
+            return self.click_by_text(flag, timeout=timeout)
 
     def is_text_selected(self, text: str) -> bool:
         ui = self.exist_by_text(text)
@@ -308,7 +308,7 @@ class DeviceBase(DeviceRandomConfig):
             return selected
         return False
 
-    def swipe_up(self, level=1):
+    def swipe_up(self):
         start_x = self._get_swipe_vertical_random_x()
         start_y = self._get_swipe_vertical_random_y_start(is_up=True)
         end_x = self._get_swipe_vertical_random_x()
