@@ -43,17 +43,21 @@ class AppRunCommon(AppRunBase):
         duration = self.device.task_operation.get_main_task_duration_with_ad()
         result = (False, duration)
         for ad in ad_flag:
+            self.logd("开始判断ad")
             if self.device.exist_by_flag(ad, 0.3):
                 duration = self.device.task_operation.get_video_ad_duration(1)
                 result = (False, duration)
                 self.logd("当前主任务是广告", repr(ad), repr(duration))
                 return result
+        self.logd("ad判断完了")
         for nor in normal:
+            self.logd("开始判断normal")
             if self.device.exist_by_flag(nor, 0.3):
                 duration = self.device.task_operation.get_main_task_duration()
                 result = (True, duration)
                 self.logd("当前主任务是常规item", result)
                 return result
+        self.logd("normal判断完了")
         for lon in long_flag:
             if self.device.exist_by_flag(lon, 0.3):
                 duration = self.device.task_operation.get_main_task_duration_with_movie()
@@ -93,4 +97,4 @@ class AppRunCommon(AppRunBase):
                     sleep(self.device.get_click_wait_time())
                 sleep(self.device.get_click_wait_time())
                 self.device.press_back()
-        self.logd("===常规操作结束===", "\n")
+        self.logd("===常规操作结束===", "enter")

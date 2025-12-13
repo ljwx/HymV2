@@ -60,7 +60,7 @@ class AppRunBase(ABC):
             for i in range(times):
                 self.logd("===开始视频广告===")
                 self.start_video_task()
-                self.logd("===结束视频广告===", "\\n")
+                self.logd("===结束视频广告===", "enter")
 
     @abstractmethod
     def handle_lunch_dialog(self):
@@ -87,7 +87,7 @@ class AppRunBase(ABC):
             self.logd("去获取余额")
             balance = self.get_balance()
             self.logd("余额", balance)
-            self.logd("===签到执行完毕===", "\\n")
+            self.logd("===签到执行完毕===", "enter")
             return result
         return False
 
@@ -104,6 +104,7 @@ class AppRunBase(ABC):
         def task():
             self.logd("====开始单个任务====")
             self.every_time_clear()
+            self.device.swipe_up()
             is_normal = self.main_task_item()
             star = (random.random() < self.star_probable) if is_normal else False
             comment = (random.random() < self.comment_probable) if is_normal else False
@@ -111,7 +112,7 @@ class AppRunBase(ABC):
             self.device.sleep_operation_random()
             self.main_task_human(star, comment, works)
             self.go_main_home_page()
-            self.logd("====结束单个任务====", "\\n")
+            self.logd("====结束单个任务====", "enter")
 
         self.device.task_operation.main_task_range(callback=lambda: task(), test_times=self.test_main_task_times)
 
@@ -148,3 +149,6 @@ class AppRunBase(ABC):
         now = datetime.now()
         formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
         print(Log.filter, formatted_time, self.app_info.name, content)
+        for item in content:
+            if str(item).lower().endswith("enter"):
+                print("")

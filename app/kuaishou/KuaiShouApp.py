@@ -86,8 +86,6 @@ class KuaiShouApp(AppRunCommon):
         return balance
 
     def main_task_item(self):
-        swipe = UIOperation(True, Operation.Swipe_Up_Mid, "",
-                            exist_timeout=self.device.task_operation.get_main_task_duration())
         shopping_ad_video = self.id_prefix + "ad_download_progress"
         ask_ad_video = "咨询"
         ad_follow_flag = self.id_prefix + "slide_play_right_link_icon"
@@ -106,7 +104,7 @@ class KuaiShouApp(AppRunCommon):
         normal, duration = self.get_main_task_item_duration(ad_flag=ads, normal=nors, long_flag=lon)
         if self.device.exist_by_flag(self.id_prefix + "follow_avatar_view", 2):
             wait = UIOperation(True, Operation.Wait, "", exist_waite_time=duration)
-            self.device.ui_operation_sequence(wait, swipe)
+            self.device.ui_operation_sequence(wait)
         else:
             self.device.swipe_up()
         return normal
@@ -128,19 +126,18 @@ class KuaiShouApp(AppRunCommon):
 
     def reward_ad_video_item(self) -> bool:
         close_flag = self.ad_id_prefix + "video_countdown_end_icon"
-        exist_waite_click = UIOperation(
-            True, Operation.Exist_Wait_Click,
-            close_flag,
-            self.ad_id_prefix + "video_countdown",
-            exist_timeout=self.device.task_operation.get_video_ad_duration(33))
 
-        def wait_and_finish() -> bool:
-            return self.device.ui_operation_sequence(exist_waite_click)
+        def first_video() -> bool:
+            if self.device.exist_by_flag(self.ad_id_prefix + "video_countdown", 6):
+                self.device.sleep_task_random(33)
+                self.device.click_by_flag(close_flag)
+                return True
+            return False
 
         def second_video() -> bool:
             if self.device.click_by_flag("领取奖励", 4):
                 self.device.sleep_task_random(3)
-                wait_and_finish()
+                first_video()
 
         # 直播
         def live_video() -> bool:
@@ -152,21 +149,20 @@ class KuaiShouApp(AppRunCommon):
 
         live_video()
 
-
-        result = wait_and_finish()
-        if result:
+        if first_video():
             second_video()
         if self.device.exist_by_flag("领取额外金币", 3):  # 打开app
             self.device.click_by_id("close_view")
-        self.device.click_by_flag(self.close_icon, timeout=3)
+        self.device.click_by_flag(self.close_icon, timeout=2)
         self.device.click_by_flag(close_flag, timeout=1)
         self.device.click_by_flag(self.close_icon, timeout=1)
         if self.device.exist_by_flag("领取额外金币", 3):  # 打开app
-            self.device.click_by_id("close_view")
-        self.device.click_by_id("close_view")
+            self.device.click_by_id("close_view", 1)
+        self.device.click_by_id("close_view", 1)
         self.device.click_by_flag("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder", 1)
-        self.device.click_by_id("close_view")
-        return result
+        self.device.click_by_id("close_view", 1)
+        self.device.click_by_id("close_view", 1)
+        return True
 
     def get_duration_reward(self) -> bool:
         if not self.go_task_page():
@@ -185,7 +181,8 @@ class KuaiShouApp(AppRunCommon):
                 if ad:
                     ad.click()
                     self.reward_ad_video_item()
-                    self.device.click_by_id("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder")  # 直播
+                    self.device.click_by_id("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder",
+                                            4)  # 直播
             else:
                 self.device.click_by_image(self.close_icon, timeout=2)
             return True
