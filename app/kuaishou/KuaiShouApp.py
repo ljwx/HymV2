@@ -1,11 +1,9 @@
 import random
 from time import sleep
 
-from numpy.core.numeric import little_endian
-
 from app.appbase.AppRunCommon import AppRunCommon
 from apppackage.AppPackage import AppInfoKuaiShou
-from constant.Const import ConstViewType
+from constant.Const import ConstViewType, ConstFlag
 from device.DeviceManager import DeviceManager
 from device.operation.UIOperation import UIOperation, Operation
 from device.uiview.UIInfo import UITargetInfo
@@ -102,6 +100,8 @@ class KuaiShouApp(AppRunCommon):
             self.device.swipe_up()
             self.device.sleep_operation_random()
         normal, duration = self.get_main_task_item_duration(ad_flag=ads, normal=nors, long_flag=lon)
+        if normal and random.random() < 0.015:
+            self.device.click_by_flag(self.id_prefix + "follow_button", 1)
         if self.device.exist_by_flag(self.id_prefix + "follow_avatar_view", 2):
             wait = UIOperation(True, Operation.Wait, "", exist_waite_time=duration)
             self.device.ui_operation_sequence(wait)
@@ -126,6 +126,7 @@ class KuaiShouApp(AppRunCommon):
 
     def reward_ad_video_item(self) -> bool:
         close_flag = self.ad_id_prefix + "video_countdown_end_icon"
+        close_view = ConstFlag.Desc + "close_view"
 
         def first_video() -> bool:
             if self.device.exist_by_flag(self.ad_id_prefix + "video_countdown", 6):
@@ -151,17 +152,14 @@ class KuaiShouApp(AppRunCommon):
 
         if first_video():
             second_video()
-        if self.device.exist_by_flag("领取额外金币", 3):  # 打开app
-            self.device.click_by_id("close_view")
-        self.device.click_by_flag(self.close_icon, timeout=2)
-        self.device.click_by_flag(close_flag, timeout=1)
+        if self.device.exist_by_flag("领取额外金币", 1):  # 打开app
+            self.device.click_by_flag(close_view)
         self.device.click_by_flag(self.close_icon, timeout=1)
-        if self.device.exist_by_flag("领取额外金币", 3):  # 打开app
-            self.device.click_by_id("close_view", 1)
-        self.device.click_by_id("close_view", 1)
+        if self.device.exist_by_flag("领取额外金币", 1):  # 打开app
+            self.device.click_by_flag(close_view, 1)
+        self.device.click_by_flag(close_view, 1)
         self.device.click_by_flag("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder", 1)
-        self.device.click_by_id("close_view", 1)
-        self.device.click_by_id("close_view", 1)
+        self.device.click_by_flag(close_view, 1)
         return True
 
     def get_duration_reward(self) -> bool:

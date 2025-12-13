@@ -1,12 +1,12 @@
 from app.kuaishou.KuaiShouApp import KuaiShouApp
-from constant.Const import ConstViewType
+from constant.Const import ConstViewType, ConstFlag
 from device.DeviceManager import DeviceManager
 from device.uiview.UIInfo import UITargetInfo
 from launch.AppLaunch import AppLaunch
 
 
 def test_run(device: DeviceManager, app: KuaiShouApp):
-    app.device.swipe_up()
+    app.device.exist_by_flag(ConstFlag.Desc+"close_view")
 
 
     # if view:

@@ -28,6 +28,8 @@ class AppRunCommon(AppRunBase):
             if self.device.exist_by_flag(self.main_home_page_flag, 4):
                 self.logd("成功回到首页")
                 if select_tab:
+                    if self.device.is_text_selected(self.main_task_tab_flag):
+                        return True
                     return self.device.click_by_flag(self.main_task_tab_flag, 2)
                 return True
             if self.main_home_page_intercept_flag is not None:

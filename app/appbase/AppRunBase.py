@@ -14,9 +14,9 @@ class AppRunBase(ABC):
     first_check_in_probably = 0.3
     execute_ad_reward_probably = 0.9
 
-    star_probable: float = 0.2
-    comment_probable: float = 0.2
-    works_probable: float = 0.6
+    star_probable: float = 0.16
+    comment_probable: float = 0.11
+    works_probable: float = 0.25
 
     test_main_task_times = None
 
@@ -42,9 +42,11 @@ class AppRunBase(ABC):
         self.logd("是否先签到", first_check_in)
         self.logd("处理启动后弹窗")
         self.handle_lunch_dialog()
+
         def check_in() -> bool:
             if not self.is_check_in() and self.go_task_page():
                 self.check_in()
+
         if first_check_in:
             check_in()
         if self.go_main_home_page(select_tab=True):
@@ -53,14 +55,14 @@ class AppRunBase(ABC):
             check_in()
         self.logd("===获取时间段奖励===")
         self.get_duration_reward()
-        self.logd("===时间段奖励结束===", "\\n")
+        self.logd("===时间段奖励结束===", "enter")
         if random.random() < self.execute_ad_reward_probably and self.go_task_page():
             times = random.randint(1, 4)
             self.logd("执行视频广告任务", str(times), "次")
             for i in range(times):
-                self.logd("===开始视频广告===")
+                self.logd("===开始视频广告item===")
                 self.start_video_task()
-                self.logd("===结束视频广告===", "enter")
+                self.logd("===结束视频广告item===", "enter")
 
     @abstractmethod
     def handle_lunch_dialog(self):
@@ -92,7 +94,7 @@ class AppRunBase(ABC):
         return False
 
     def is_check_in(self) -> bool:
-        return True
+        return False
 
     @abstractmethod
     def execute_check_in(self) -> bool:
@@ -113,6 +115,11 @@ class AppRunBase(ABC):
             self.main_task_human(star, comment, works)
             self.go_main_home_page()
             self.logd("====结束单个任务====", "enter")
+            if random.random() < 0.07:
+                self.device.press_home()
+                sleep(random.randint(4, 32))
+                self.device.start_app(self.app_info.package_name)
+                self.device.sleep_operation_random()
 
         self.device.task_operation.main_task_range(callback=lambda: task(), test_times=self.test_main_task_times)
 

@@ -2,7 +2,7 @@ import random
 
 from poco.proxy import UIObjectProxy
 
-from constant.Const import ConstViewType
+from constant.Const import ConstViewType, ConstFlag
 from device.DeviceBase import DeviceBase
 from device.DeviceInfo import DeviceInfo
 from device.uiview.UIInfo import UITargetInfo
@@ -28,7 +28,7 @@ class DeviceFindView(DeviceBase):
 
     def _get_position_by_desc(self, desc: str, timeout=10) -> tuple[float, float] | None:
         if self.exist_by_desc(desc, timeout=timeout):
-            element = self.poco(desc=desc)
+            element = self.poco(desc=desc.replace(ConstFlag.Desc, ""))
             position = element.get_position()
             return position
         return None
@@ -128,8 +128,13 @@ class DeviceFindView(DeviceBase):
         return None
 
     def find_list_by_flag(self, flag: str, timeout=3) -> UIObjectProxy | None:
-        if flag.__contains__("com."):
+        if self.flag_is_id(flag):
             types = self.poco(name=flag).wait(timeout=timeout)
+            if types and len(types) > 0:
+                index = random.randint(0, len(types) - 1)
+                return types[index]
+        elif self.flag_is_desc(flag):
+            types = self.poco(desc=flag.replace(ConstFlag.Desc)).wait(timeout=timeout)
             if types and len(types) > 0:
                 index = random.randint(0, len(types) - 1)
                 return types[index]
@@ -138,11 +143,6 @@ class DeviceFindView(DeviceBase):
             if types and len(types) > 0:
                 index = random.randint(0, len(types) - 1)
                 return types[index]
-            else:
-                types = self.poco(desc=flag).wait(timeout=timeout)
-                if types and len(types) > 0:
-                    index = random.randint(0, len(types) - 1)
-                    return types[index]
         return None
 
     def find_list_by_child(self, flag: str, timeout=3) -> UIObjectProxy | None:

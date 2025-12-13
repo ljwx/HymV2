@@ -209,7 +209,7 @@ class DeviceBase(DeviceRandomConfig):
 
     def exist_by_desc(self, desc: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
-            element = self.poco(desc=desc).wait(timeout=timeout)
+            element = self.poco(desc=desc.replace(ConstFlag.Desc, "")).wait(timeout=timeout)
             if len(element) > 1:
                 for i in element:
                     self.logd("多个desc:" + desc, i.get_position())
