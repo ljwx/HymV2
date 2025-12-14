@@ -2,60 +2,44 @@ import asyncio
 import random
 from time import sleep
 
+from poco.proxy import UIObjectProxy
+
 from app.appbase.AppRunCommon import AppRunCommon
 from app.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData
-from apppackage.AppPackage import AppInfoKuaiShou
+from apppackage.AppPackage import AppInfoKuaiShou, AppInfoDouYin
 from constant.Const import ConstViewType, ConstFlag
 from device.DeviceManager import DeviceManager
 from device.operation.UIOperation import UIOperation, Operation
 from device.uiview.UIInfo import UITargetInfo
 
 
-class KuaiShouApp(AppRunCommon):
-    app_info = AppInfoKuaiShou
+class DouYinApp(AppRunCommon):
+    app_info = AppInfoDouYin
     id_prefix = app_info.id_prefix
     ad_id_prefix = app_info.ad_id_prefix
 
     def __init__(self, device: DeviceManager):
         self.device = device
         super().__init__(self.app_info, device)
-        self.resource_dir = "kuaishou/"
-        self.close_icon = self.resource_dir + "task_tab_page_close_icon.png"
+        self.resource_dir = "douyin/"
+
+        self.task_page_success = self.resource_dir + "task_page_success_icon.png"
+        self.close_icon = self.resource_dir + "bg_white_close_icon.png"
         self.check_in_icon = self.resource_dir + "check_in_icon.png"
 
     def handle_launch_dialog(self):
         super().handle_launch_dialog()
-        if self.device.exist_by_text("邀请2个新用户必得"):
-            close_icon = self.device.find_ui_by_info(UITargetInfo(ConstViewType.Image, (0.0758, 0.0340), (0.5, 0.7003)))
-            if close_icon:
-                close_icon.click(focus=self.device.get_click_position_offset())
-        # if self.device.exist_by_flag("朋友推荐", 1):
-        #     self.device.click_by_flag("com.kuaishou.nebula:id/close_btn", 2)
-        # self.device.ui_operation_sequence(UIOperation(False, Operation.Exist_Click, "","限时大红包", "邀请新用户"))
         pass
 
     def get_handle_launch_dialog_flag(self) -> AppLaunchDialogData:
-        return AppLaunchDialogData([self.id_prefix + "close_btn"])
+        return AppLaunchDialogData([])
 
     def get_main_home_page_flag(self) -> MainHomePageData:
-        return MainHomePageData(self.id_prefix + "bottom_bar_container", "首页", None)
+        return MainHomePageData(self.id_prefix + "root_view", "首页", None)
 
     def get_task_page_flag(self) -> MainTaskPageData:
-        return MainTaskPageData(True, "去赚钱", "任务中心", [self.close_icon, self.close_icon])
-
-    # def go_task_page(self) -> bool:
-    #     self.go_main_home_page()
-    #     tab_flag = "去赚钱"
-    #     selected = self.device.is_text_selected(tab_flag)
-    #     if selected or self.device.click_by_text(tab_flag):
-    #         sleep(4)
-    #         ad1 = UIOperation(False, Operation.Exist_Click, self.close_icon, "瓜分百亿金币", 2)
-    #         ad2 = UIOperation(False, Operation.Exist_Click, self.close_icon, "添加组件 金币领取不怕忘", 1)
-    #         ad3 = UIOperation(False, Operation.Exist_Click, self.close_icon, "看内容领取金币", 1)
-    #         ad4 = UIOperation(False, Operation.Exist_Click, self.close_icon, "去微信邀请好友", 1)
-    #         exist = UIOperation(True, Operation.Exist, "任务中心", exist_timeout=4)
-    #         return self.device.ui_operation_sequence(ad1, ad2, ad3, ad4, exist)
-    #     return False
+        task_tab_icon = self.resource_dir + "main_task_tab.png"
+        return MainTaskPageData(True, task_tab_icon, self.task_page_success, [self.close_icon])
 
     def execute_check_in(self) -> bool:
         exist_click = UIOperation(True, Operation.Exist_Click, self.check_in_icon, "今日签到可领")
@@ -100,7 +84,7 @@ class KuaiShouApp(AppRunCommon):
         normal, duration = asyncio.run(self.get_main_task_item_duration(ad_flag=ads, normal=nors, long_flag=lon))
         if normal and random.random() < 0.015:
             self.device.click_by_flag(self.id_prefix + "follow_button", 1)
-        if self.device.exist_by_flag(self.id_prefix + "follow_avatar_view", 2):
+        if self.device.exist_by_flag(self.id_prefix + "user_avatar", 2):
             wait = UIOperation(True, Operation.Wait, "", exist_waite_time=duration)
             self.device.ui_operation_sequence(wait)
         else:
@@ -114,56 +98,60 @@ class KuaiShouApp(AppRunCommon):
             self.id_prefix + "recycler_view")
 
     def start_video_task(self):
-        video_ad_enter = "看广告得金币"
+
+        def find_enter() -> bool | None:
+            first = self.device.find_all_contain_name(ConstViewType.Group, "每20分钟完成一次广告任务", 2)
+            if first:
+                first.click()
+                return True
+            second = self.device.find_all_contain_name(ConstViewType.Group, "看广告视频，", 2)
+            if second:
+                second.click()
+                return True
+            return False
 
         def execute():
             self.reward_ad_video_item()
             sleep(self.device.get_click_wait_time())
 
         if self.go_task_page():
-            if self.device.click_by_flag(video_ad_enter, 4):
+            if find_enter():
                 execute()
             else:
                 self.device.swipe_up()
-                if self.device.click_by_flag(video_ad_enter, 4):
+                if find_enter():
                     execute()
 
     def reward_ad_video_item(self) -> bool:
-        close_flag = self.ad_id_prefix + "video_countdown_end_icon"
-        close_view = ConstFlag.Desc + "close_view"
+        self.device.click_by_flag(self.resource_dir + "duration_reward_close_icon.png", 1)
+
+        def ad_page_back():
+            self.device.click_by_flag(self.id_prefix + "iv_back", 1)
 
         def first_video() -> bool:
-            if self.device.exist_by_flag(self.ad_id_prefix + "video_countdown", 6):
-                self.device.sleep_task_random(33)
-                self.device.click_by_flag(close_flag)
-                return True
+            if self.device.find_all_contain_name(ConstViewType.Group, "秒后可领奖励", 4):
+                self.device.sleep_operation_random(random.randint(33, 39))
+                ad_page_back()
+                close_flag = self.device.find_all_contain_name(ConstViewType.Group, "领取成功，关闭，按钮", 4)
+                if close_flag:
+                    ad_page_back()
+                    close_flag.click(focus=self.device.get_click_position_offset())
+                    ad_page_back()
+                    close_flag.click(focus=self.device.get_click_position_offset())
+                ad_page_back()
             return False
 
         def second_video() -> bool:
-            if self.device.click_by_flag("领取奖励", 4):
+            if self.device.click_by_flag(self.resource_dir + "video_ad_second_flag.png", 4):
                 self.device.sleep_task_random(3)
                 first_video()
 
-        # 直播
-        def live_video() -> bool:
-            if self.device.exist_by_flag("com.kuaishou.nebula.live_audience_plugin:id/live_audience_bottom_mask_view",
-                                         3):
-                sleep(random.randint(16, 32))
-                self.device.click_by_flag("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder", 2)
-                second_video()
-
-        live_video()
-
-        if first_video():
+        for i in range(2):
+            first_video()
             second_video()
-        if self.device.exist_by_flag("领取额外金币", 1):  # 打开app
-            self.device.click_by_flag(close_view)
-        self.device.click_by_flag(self.close_icon, timeout=1)
-        if self.device.exist_by_flag("领取额外金币", 1):  # 打开app
-            self.device.click_by_flag(close_view, 1)
-        self.device.click_by_flag(close_view, 1)
-        self.device.click_by_flag("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder", 1)
-        self.device.click_by_flag(close_view, 1)
+            self.device.click_by_flag(self.id_prefix + "iv_back", 1)
+        self.device.click_by_flag(self.resource_dir + "close_video_ad_icon.png", 1)
+        self.device.click_by_flag(self.resource_dir + "close_video_ad_icon.png", 1)
         return True
 
     def get_duration_reward(self) -> bool:

@@ -67,7 +67,7 @@ class AppRunBase(ABC):
         self.get_duration_reward()
         self.logd("===时间段奖励结束===", "enter")
         if random.random() < self.execute_ad_reward_probably and self.go_task_page():
-            times = random.randint(1, 4)
+            times = random.randint(1, 3)
             self.logd("执行视频广告任务", str(times), "次")
             for i in range(times):
                 self.logd("===开始视频广告item===")
@@ -96,9 +96,10 @@ class AppRunBase(ABC):
             self.logd("现在执行签到")
             result = self.execute_check_in()
             self.logd("签到结果", result)
-            self.logd("去获取余额")
-            balance = self.get_balance()
-            self.logd("余额", balance)
+            if self.app_info.enable_balance:
+                self.logd("去获取余额")
+                balance = self.get_balance()
+                self.logd("余额", balance)
             self.logd("===签到执行完毕===", "enter")
             return result
         return False

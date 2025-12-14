@@ -123,7 +123,18 @@ class DeviceFindView(DeviceBase):
         for ui in types:
             ui_text = ui.get_text()
             if ui_text and text in ui_text:
-                print(ui_text)
+                self.logd("找到了", ui_text)
+                return ui
+        return None
+
+    def find_all_contain_name(self, view_type: str, text: str, timeout=3) -> UIObjectProxy | None:
+        types = self.poco(type=view_type).wait(timeout=timeout)
+        if not types:
+            return None
+        for ui in types:
+            ui_text = ui.get_name()
+            if ui_text and text in ui_text:
+                self.logd("找到了", ui_text)
                 return ui
         return None
 

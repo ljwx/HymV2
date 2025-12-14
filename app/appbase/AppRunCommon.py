@@ -59,13 +59,17 @@ class AppRunCommon(AppRunBase):
         flag = self.get_task_page_flag()
         if flag.first_go_home:
             self.go_main_home_page()
-        selected = self.device.is_text_selected(flag.task_tab_flag)
-        if selected or self.device.click_by_text(flag.task_tab_flag):
-            sleep(4)
-            for ad in flag.task_page_ad_flag:
-                self.device.click_by_text(ad, 1)
-            if self.device.exist_by_flag(flag.task_page_flag, 2):
-                return True
+        if self.device.flag_is_image(flag.task_tab_flag):
+            if self.device.click_by_flag(flag.task_tab_flag, 1):
+                sleep(4)
+        else:
+            selected = self.device.is_text_selected(flag.task_tab_flag)
+            if selected or self.device.click_by_text(flag.task_tab_flag):
+                sleep(4)
+        for ad in flag.task_page_ad_flag:
+            self.device.click_by_text(ad, 1)
+        if self.device.exist_by_flag(flag.task_page_flag, 2):
+            return True
         return False
 
     @abstractmethod
@@ -150,7 +154,7 @@ class AppRunCommon(AppRunBase):
                     if item and item.exists():
                         try:
                             self.device.sleep_operation_random()
-                            item.click()
+                            item.click(focus=self.device.get_click_position_offset())
                             self.main_task_item()
                             self.device.press_back()
                             self.device.sleep_operation_random()
