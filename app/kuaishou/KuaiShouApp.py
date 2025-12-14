@@ -1,3 +1,4 @@
+import asyncio
 import random
 from time import sleep
 
@@ -87,18 +88,16 @@ class KuaiShouApp(AppRunCommon):
         ask_ad_video = "咨询"
         ad_follow_flag = self.id_prefix + "slide_play_right_link_icon"
         live_video_text = "点击进入直播间"
-        long_video1 = "继续观看完整版"
-        long_video2 = "完整版"
         ads = [shopping_ad_video, ask_ad_video, ad_follow_flag]
         nors = [self.id_prefix + "create_date_tv", "全屏观看", "作者声明：演绎情节，仅供娱乐",
                 self.id_prefix + "general_entry_single_root_view",
                 self.id_prefix + "pic_text"]
-        lon = [long_video1, long_video2]
+        lon = ["继续观看完整版", "完整版", "合集"]
         if not self.device.exist_by_flag(self.id_prefix + "follow_avatar_view", 1.5):
             self.logd("非正常item，下一个")
             self.device.swipe_up()
             self.device.sleep_operation_random()
-        normal, duration = self.get_main_task_item_duration(ad_flag=ads, normal=nors, long_flag=lon)
+        normal, duration = asyncio.run(self.get_main_task_item_duration(ad_flag=ads, normal=nors, long_flag=lon))
         if normal and random.random() < 0.015:
             self.device.click_by_flag(self.id_prefix + "follow_button", 1)
         if self.device.exist_by_flag(self.id_prefix + "follow_avatar_view", 2):

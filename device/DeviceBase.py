@@ -218,8 +218,8 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists("desc:" + desc + "，异常：" + e)
             return None
 
-    def exist_by_image(self, image_path: str, threshold=0.75, timeout: float = default_wait_view_timeout) -> tuple[
-                                                                                                                 float, float] | None:
+    def exist_by_image(self, image_path: str, threshold=0.75, timeout: float = default_wait_view_timeout) -> \
+            tuple[float, float] | None:
         try:
             abs_path = str(Path(self.get_resource_path(image_path)).resolve())
             if not os.path.exists(abs_path):
@@ -258,7 +258,6 @@ class DeviceBase(DeviceRandomConfig):
 
     def __execute_click(self, flag: str, element: UIObjectProxy | None, double_check: bool = False) -> bool:
         if element is not None:
-            sleep(self.get_click_wait_time())
             result = element.click(focus=self.get_click_position_offset())
             if double_check:
                 element.click(focus=self.get_click_position_offset())
@@ -267,7 +266,8 @@ class DeviceBase(DeviceRandomConfig):
                 return True
         return False
 
-    def click_by_id(self, resource_id: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
+    def click_by_id(self, resource_id: str, timeout=default_wait_view_timeout,
+                    double_check: bool = False) -> bool:
         element = self.exist_by_id(resource_id, timeout=timeout)
         return self.__execute_click(resource_id, element, double_check=double_check)
 

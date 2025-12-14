@@ -1,13 +1,23 @@
+import asyncio
 import random
+import threading
 import time
 import traceback
 from abc import ABC, abstractmethod
 from datetime import datetime
 from time import sleep
+from typing import Any
 
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 from logevent.Log import Log
+
+RED = '\033[91m'
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+BLUE = '\033[94m'
+RESET = '\033[0m'  # 重置颜色
+print_lock = threading.Lock()
 
 
 class AppRunBase(ABC):
@@ -94,7 +104,7 @@ class AppRunBase(ABC):
         return False
 
     def is_check_in(self) -> bool:
-        return False
+        return True
 
     @abstractmethod
     def execute_check_in(self) -> bool:
@@ -152,10 +162,26 @@ class AppRunBase(ABC):
     def every_time_clear(self):
         ...
 
+    async def async_task(self, task_def: list) -> Any | None:
+        tasks = []
+        for item_def in task_def:
+            tasks.append(asyncio.create_task(item_def))
+        while tasks:
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                result = task.result()
+                if result:
+                    for p in pending:
+                        p.cancel()
+                    return result
+            tasks = list(pending)
+        return None
+
     def logd(self, *content):
         now = datetime.now()
         formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
-        print(Log.filter, formatted_time, self.app_info.name, content)
+        with print_lock:
+            print(Log.filter, formatted_time, self.app_info.name, *content, flush=True)
         for item in content:
             if str(item).lower().endswith("enter"):
-                print("")
+                print("", flush=True)
