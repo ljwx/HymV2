@@ -1,3 +1,4 @@
+import ast
 import os
 from datetime import datetime
 from pathlib import Path
@@ -174,6 +175,9 @@ class DeviceBase(DeviceRandomConfig):
     def flag_is_desc(self, flag: str) -> bool:
         return flag.startswith(ConstFlag.Desc)
 
+    def flag_is_position(self, flag: str) -> bool:
+        return flag.startswith(ConstFlag.Position)
+
     def __execute_exist_by_flag(self, flag: str, element: UIObjectProxy | None) -> UIObjectProxy | None:
         try:
             exist = element.exists()
@@ -297,6 +301,11 @@ class DeviceBase(DeviceRandomConfig):
             return self.click_by_image(flag, timeout=timeout)
         elif self.flag_is_desc(flag):
             return self.click_by_desc(flag, timeout=timeout)
+        elif self.flag_is_position(flag):
+            pos_str = flag.replace(ConstFlag.Position, "")
+            pos = tuple(ast.literal_eval(pos_str))
+            self.dev.touch(pos=self.get_touch_position_offset(pos), duration=self.get_touch_duration())
+            return True
         else:
             return self.click_by_text(flag, timeout=timeout)
 

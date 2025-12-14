@@ -21,7 +21,7 @@ class DeviceRandomConfig(ABC):
         time.sleep(random.uniform(duration, duration + diff))
 
     def _get_random_duration(self) -> float:
-        return random.uniform(0.01, 0.1)
+        return random.uniform(0.03, 0.15)
 
     def _get_click_timeout(self) -> float:
         return random.uniform(0.5, 2.8)

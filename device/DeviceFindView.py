@@ -156,10 +156,22 @@ class DeviceFindView(DeviceBase):
                 return types[index]
         return None
 
+    def __find_recycler_view(self, timeout) -> UIObjectProxy | None:
+        ui = self.poco(type=ConstViewType.Recycler).wait(timeout=timeout)
+        if ui:
+            return ui
+        return None
+
     def find_list_by_child(self, flag: str, timeout=3) -> UIObjectProxy | None:
         try:
-            parent = self.poco(resourceId=flag).wait(timeout=timeout)
-            if parent.exists():
+            parent = None
+            if flag.__contains__("widget.RecyclerView"):
+                ui = self.__find_recycler_view(timeout)
+                if ui:
+                    parent = ui
+            else:
+                parent = self.poco(resourceId=flag).wait(timeout=timeout)
+            if parent and parent.exists():
                 children = parent.children()
                 if children and len(children) > 0:
                     index = random.randint(0, len(children) - 1)

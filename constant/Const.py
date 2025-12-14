@@ -12,3 +12,4 @@ class ConstViewType:
 
 class ConstFlag:
     Desc = "desc;"
+    Position = "position;"

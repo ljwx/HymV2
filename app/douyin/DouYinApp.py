@@ -66,34 +66,28 @@ class DouYinApp(AppRunCommon):
         return balance
 
     def main_task_item(self):
-        shopping_ad_video = self.id_prefix + "ad_download_progress"
-        ask_ad_video = "咨询"
-        ad_follow_flag = self.id_prefix + "slide_play_right_link_icon"
-        live_video_text = "点击进入直播间"
-        ads = [shopping_ad_video, ask_ad_video, ad_follow_flag]
-        nors = [self.id_prefix + "create_date_tv", "全屏观看", "作者声明：演绎情节，仅供娱乐",
-                self.id_prefix + "general_entry_single_root_view",
-                self.id_prefix + "pic_text"]
-        lon = ["继续观看完整版", "完整版", "合集"]
-        if not self.device.exist_by_flag(self.id_prefix + "follow_avatar_view", 1.5):
+        exist_flag = self.id_prefix + "user_avatar"
+        ads = [ConstFlag.Desc + "当前直播间可用"]
+        nors = [ConstFlag.Desc + "音乐，@🧊创作的原声，按钮", "全屏观看", "相关搜索", "拍同款"]
+        lon = ["点击进入看全集", "听抖音"]
+        if not self.device.exist_by_flag(exist_flag, 1.5):
             self.logd("非正常item，下一个")
             self.device.swipe_up()
             self.device.sleep_operation_random()
         normal, duration = asyncio.run(self.get_main_task_item_duration(ad_flag=ads, normal=nors, long_flag=lon))
-        if normal and random.random() < 0.015:
-            self.device.click_by_flag(self.id_prefix + "follow_button", 1)
-        if self.device.exist_by_flag(self.id_prefix + "user_avatar", 2):
-            wait = UIOperation(True, Operation.Wait, "", exist_waite_time=duration)
-            self.device.ui_operation_sequence(wait)
+        if normal and random.random() < 0.1:
+            self.device.click_by_flag(self.resource_dir + "follow_user", 1)
+        if self.device.exist_by_flag(exist_flag, 2):
+            sleep(duration)
         else:
             self.device.swipe_up()
         return normal
 
     def get_main_human_flag(self) -> MainTaskHumanData:
         return MainTaskHumanData(
-            self.id_prefix + "like_icon", self.id_prefix + "comment_icon",
-            self.id_prefix + "user_name_text_view", self.id_prefix + "profile_user_kwai_id",
-            self.id_prefix + "recycler_view")
+            ConstFlag.Position + "[0.9133, 0.4898]", ConstFlag.Position + "[0.9133, 0.5737]",
+            self.id_prefix + "user_avatar", "获赞",
+            ConstViewType.Recycler)
 
     def start_video_task(self):
 
