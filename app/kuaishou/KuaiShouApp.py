@@ -2,6 +2,7 @@ import random
 from time import sleep
 
 from app.appbase.AppRunCommon import AppRunCommon
+from app.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData
 from apppackage.AppPackage import AppInfoKuaiShou
 from constant.Const import ConstViewType, ConstFlag
 from device.DeviceManager import DeviceManager
@@ -14,18 +15,6 @@ class KuaiShouApp(AppRunCommon):
     id_prefix = app_info.id_prefix
     ad_id_prefix = app_info.ad_id_prefix
 
-    # 回首页
-    main_home_page_flag = id_prefix + "bottom_bar_container"
-    main_task_tab_flag = "首页"
-    main_home_page_intercept_flag: list | None = None
-
-    # 点赞
-    star_flag = id_prefix + "like_icon"
-    comment_flag = id_prefix + "comment_icon"
-    go_works_flag = id_prefix + "user_name_text_view"
-    works_success_flag = id_prefix + "profile_user_kwai_id"
-    works_list_flag = id_prefix + "recycler_view"
-
     def __init__(self, device: DeviceManager):
         self.device = device
         super().__init__(self.app_info, device)
@@ -33,29 +22,39 @@ class KuaiShouApp(AppRunCommon):
         self.close_icon = self.resource_dir + "task_tab_page_close_icon.png"
         self.check_in_icon = self.resource_dir + "check_in_icon.png"
 
-    def handle_lunch_dialog(self):
+    def handle_launch_dialog(self):
+        super().handle_launch_dialog()
         if self.device.exist_by_text("邀请2个新用户必得"):
             close_icon = self.device.find_ui_by_info(UITargetInfo(ConstViewType.Image, (0.0758, 0.0340), (0.5, 0.7003)))
             if close_icon:
                 close_icon.click()
-        if self.device.exist_by_flag("朋友推荐", 1):
-            self.device.click_by_flag("com.kuaishou.nebula:id/close_btn", 2)
+        # if self.device.exist_by_flag("朋友推荐", 1):
+        #     self.device.click_by_flag("com.kuaishou.nebula:id/close_btn", 2)
         # self.device.ui_operation_sequence(UIOperation(False, Operation.Exist_Click, "","限时大红包", "邀请新用户"))
         pass
 
-    def go_task_page(self) -> bool:
-        self.go_main_home_page()
-        tab_flag = "去赚钱"
-        selected = self.device.is_text_selected(tab_flag)
-        if selected or self.device.click_by_text(tab_flag):
-            sleep(4)
-            ad1 = UIOperation(False, Operation.Exist_Click, self.close_icon, "瓜分百亿金币", 2)
-            ad2 = UIOperation(False, Operation.Exist_Click, self.close_icon, "添加组件 金币领取不怕忘", 1)
-            ad3 = UIOperation(False, Operation.Exist_Click, self.close_icon, "看内容领取金币", 1)
-            ad4 = UIOperation(False, Operation.Exist_Click, self.close_icon, "去微信邀请好友", 1)
-            exist = UIOperation(True, Operation.Exist, "任务中心", exist_timeout=4)
-            return self.device.ui_operation_sequence(ad1, ad2, ad3, ad4, exist)
-        return False
+    def get_handle_launch_dialog_flag(self) -> AppLaunchDialogData:
+        return AppLaunchDialogData([self.id_prefix + "close_btn"])
+
+    def get_main_home_page_flag(self) -> MainHomePageData:
+        return MainHomePageData(self.id_prefix + "bottom_bar_container", "首页", None)
+
+    def get_task_page_flag(self) -> MainTaskPageData:
+        return MainTaskPageData(True, "去赚钱", "任务中心", [self.close_icon, self.close_icon])
+
+    # def go_task_page(self) -> bool:
+    #     self.go_main_home_page()
+    #     tab_flag = "去赚钱"
+    #     selected = self.device.is_text_selected(tab_flag)
+    #     if selected or self.device.click_by_text(tab_flag):
+    #         sleep(4)
+    #         ad1 = UIOperation(False, Operation.Exist_Click, self.close_icon, "瓜分百亿金币", 2)
+    #         ad2 = UIOperation(False, Operation.Exist_Click, self.close_icon, "添加组件 金币领取不怕忘", 1)
+    #         ad3 = UIOperation(False, Operation.Exist_Click, self.close_icon, "看内容领取金币", 1)
+    #         ad4 = UIOperation(False, Operation.Exist_Click, self.close_icon, "去微信邀请好友", 1)
+    #         exist = UIOperation(True, Operation.Exist, "任务中心", exist_timeout=4)
+    #         return self.device.ui_operation_sequence(ad1, ad2, ad3, ad4, exist)
+    #     return False
 
     def execute_check_in(self) -> bool:
         exist_click = UIOperation(True, Operation.Exist_Click, self.check_in_icon, "今日签到可领")
@@ -108,6 +107,12 @@ class KuaiShouApp(AppRunCommon):
         else:
             self.device.swipe_up()
         return normal
+
+    def get_main_human_flag(self) -> MainTaskHumanData:
+        return MainTaskHumanData(
+            self.id_prefix + "like_icon", self.id_prefix + "comment_icon",
+            self.id_prefix + "user_name_text_view", self.id_prefix + "profile_user_kwai_id",
+            self.id_prefix + "recycler_view")
 
     def start_video_task(self):
         video_ad_enter = "看广告得金币"

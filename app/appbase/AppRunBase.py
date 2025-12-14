@@ -29,7 +29,7 @@ class AppRunBase(ABC):
             self.logd("启动")
             # if not self.device.is_app_running(self.packageInfo.package_name):
             self.device.start_app(self.app_info.package_name)
-            sleep(4)
+            sleep(6)
             self.common_step()
             return True
         except Exception as e:
@@ -41,7 +41,7 @@ class AppRunBase(ABC):
         first_check_in = random.random() < self.first_check_in_probably
         self.logd("是否先签到", first_check_in)
         self.logd("处理启动后弹窗")
-        self.handle_lunch_dialog()
+        self.handle_launch_dialog()
 
         def check_in() -> bool:
             if not self.is_check_in() and self.go_task_page():
@@ -65,7 +65,7 @@ class AppRunBase(ABC):
                 self.logd("===结束视频广告item===", "enter")
 
     @abstractmethod
-    def handle_lunch_dialog(self):
+    def handle_launch_dialog(self):
         ...
 
     @abstractmethod
