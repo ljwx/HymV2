@@ -22,10 +22,7 @@ class DouYinApp(AppRunCommon):
         self.device = device
         super().__init__(self.app_info, device)
         self.resource_dir = "douyin/"
-
-        self.task_page_success = self.resource_dir + "task_page_success_icon.png"
         self.close_icon = self.resource_dir + "bg_white_close_icon.png"
-        self.check_in_icon = self.resource_dir + "check_in_icon.png"
 
     def handle_launch_dialog(self):
         super().handle_launch_dialog()
@@ -39,20 +36,21 @@ class DouYinApp(AppRunCommon):
 
     def get_task_page_flag(self) -> MainTaskPageData:
         task_tab_icon = self.resource_dir + "main_task_tab.png"
-        return MainTaskPageData(True, task_tab_icon, self.task_page_success, [self.close_icon])
+        task_page_success = self.resource_dir + "task_page_success_icon.png"
+        return MainTaskPageData(True, task_tab_icon, task_page_success, [self.close_icon])
 
     def execute_check_in(self) -> bool:
-        exist_click = UIOperation(True, Operation.Exist_Click, self.check_in_icon, "今日签到可领")
-        check_in_result = UIOperation(True, Operation.Exist, "明日签到可领", )
         result = False
-        if self.device.ui_operation_sequence(exist_click, check_in_result):
+        if self.device.click_by_flag(self.resource_dir + "check_in_btn.png"):
             result = True
-        standby_check_in = UIOperation(True, Operation.Click, "立即签到", exist_timeout=2)
-        if not result and self.device.ui_operation_sequence(standby_check_in):
-            result = True
-        if self.device.click_by_text("去看视频"):
-            self.reward_ad_video_item()
-        self.device.click_by_image(self.close_icon, timeout=2)
+            self.device.sleep_operation_random()
+            self.device.click_by_flag(self.resource_dir + "check_in_success_close_icon.png")
+        # standby_check_in = UIOperation(True, Operation.Click, "立即签到", exist_timeout=2)
+        # if not result and self.device.ui_operation_sequence(standby_check_in):
+        #     result = True
+        # if self.device.click_by_text("去看视频"):
+        #     self.reward_ad_video_item()
+        # self.device.click_by_image(self.close_icon, timeout=2)
         return result
 
     def get_balance(self) -> str | None:
@@ -157,24 +155,8 @@ class DouYinApp(AppRunCommon):
     def get_duration_reward(self) -> bool:
         if not self.go_task_page():
             return False
-        trigger1 = self.device.find_all_contain_text(ConstViewType.Text, "金币立即领取", timeout=3)
-        if trigger1:
-            trigger1.click(focus=self.device.get_click_position_offset())
-            if self.device.exist_by_flag("任务完成奖励"):
-                self.device.click_by_flag(self.close_icon, timeout=2)
-        ui_trigger = self.device.find_all_contain_text(ConstViewType.Button, "点可领", timeout=2)
-        if ui_trigger:
-            ui_trigger.click(focus=self.device.get_click_position_offset())
-            sleep(3)
-            if random.random() < 0.5:
-                ad = self.device.find_all_contain_text(ConstViewType.Button, "去看广告得最高", timeout=5)
-                if ad:
-                    ad.click(focus=self.device.get_click_position_offset())
-                    self.reward_ad_video_item()
-                    self.device.click_by_id("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder",
-                                            4)  # 直播
-            else:
-                self.device.click_by_image(self.close_icon, timeout=2)
+        if self.device.click_by_flag(self.resource_dir + "duration_reward_icon.png", 1):
+            self.device.click_by_image(self.resource_dir + "duration_reward_close_icon.png", 4)
             return True
         return False
 
