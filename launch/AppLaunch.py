@@ -1,3 +1,4 @@
+import random
 import traceback
 from time import sleep
 from typing import Callable, Any
@@ -34,6 +35,11 @@ class AppLaunch:
                     callback(device, app)
                 else:
                     app.launch_app()
+                    device.sleep_operation_random()
+                    if random.random() > 0.5:
+                        device.press_home()
+                        device.sleep_operation_random()
+                        device.stop_app()
             except Exception as e:
                 print("app运行异常", e)
                 traceback.print_exc()

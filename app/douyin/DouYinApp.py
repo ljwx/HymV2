@@ -10,7 +10,7 @@ from apppackage.AppPackage import AppInfoKuaiShou, AppInfoDouYin
 from constant.Const import ConstViewType, ConstFlag
 from device.DeviceManager import DeviceManager
 from device.operation.UIOperation import UIOperation, Operation
-from device.uiview.UIInfo import UITargetInfo
+from device.uiview.FindUIInfo import FindUITargetInfo
 
 
 class DouYinApp(AppRunCommon):
@@ -58,8 +58,8 @@ class DouYinApp(AppRunCommon):
         go_success = UIOperation(True, Operation.Exist, "我的收益")
         balance = None
         if self.device.ui_operation_sequence(go_coin, go_success):
-            ui = self.device.find_ui_by_info(
-                UITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898)))
+            ui = self.device.exist_by_find_info(
+                FindUITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898)))
             if ui and ui.get_text():
                 balance = ui.get_text()
             self.device.press_back()
@@ -149,8 +149,16 @@ class DouYinApp(AppRunCommon):
     def get_duration_reward(self) -> bool:
         if not self.go_task_page():
             return False
+        close_icon = self.resource_dir + "duration_reward_close_icon.png"
+        go_ad_enter = FindUITargetInfo(ConstViewType.Group, size=(0.5866, 0.0625), position=(0.5, 0.5535),
+                                       z_orders={'global': 0, 'local': 3}, parent_name=ConstViewType.Group)
+        if self.device.click_by_flag(ConstFlag.Desc + "开宝箱得金币", 2):
+            self.device.click_by_flag(close_icon, 4)
+            if self.device.click_by_find_info(go_ad_enter, 4):
+                self.reward_ad_video_item()
+            return True
         if self.device.click_by_flag(self.resource_dir + "duration_reward_icon.png", 1):
-            self.device.click_by_image(self.resource_dir + "duration_reward_close_icon.png", 4)
+            self.device.click_by_flag(close_icon, 4)
             return True
         return False
 

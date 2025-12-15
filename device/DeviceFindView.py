@@ -5,7 +5,7 @@ from poco.proxy import UIObjectProxy
 from constant.Const import ConstViewType, ConstFlag
 from device.DeviceBase import DeviceBase
 from device.DeviceInfo import DeviceInfo
-from device.uiview.UIInfo import UITargetInfo
+from device.uiview.FindUIInfo import FindUITargetInfo
 
 
 class DeviceFindView(DeviceBase):
@@ -84,12 +84,13 @@ class DeviceFindView(DeviceBase):
         y = abs(screen_position[1] - target_position[1]) < position_diff
         return x and y
 
-    def find_ui_by_info(self, ui_info: UITargetInfo, timeout=3) -> UIObjectProxy | None:
+    def exist_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> UIObjectProxy | None:
         types = self.poco(type=ui_info.ui_name).wait(timeout=timeout)
         for type in types:
             size_match = True
             position_match = True
             parent_match = True
+            z_orders_match = True
             if ui_info.size is not None:
                 if not self.__size_match(type.get_size(), ui_info.size):
                     size_match = False
@@ -97,15 +98,24 @@ class DeviceFindView(DeviceBase):
                 if not self.__position_match(type.get_position(), ui_info.position):
                     position_match = False
             if ui_info.parent_name is not None:
-                parent = types.parent()
+                parent = type.parent()
                 if not parent.exists() or not parent.get_name() == ui_info.parent_name:
                     parent_match = False
-            if size_match and position_match and parent_match:
+            if ui_info.z_orders is not None:
+                z_orders_match = False
+                zord = type.attr("zOrders")
+                if isinstance(zord, dict):
+                    _global = zord.get("global") == ui_info.z_orders.get("global")
+                    _local = zord.get("local") == ui_info.z_orders.get("local")
+                    if _global and _local:
+                        z_orders_match = True
+            if size_match and position_match and parent_match and z_orders_match:
+                self.logd("通过ui_info找到了ui", str(ui_info.desc) if ui_info.desc is not None else "")
                 return type
         return None
 
-    def find_ui_and_click(self, ui_info: UITargetInfo, timeout=3) -> bool:
-        ui = self.find_ui_by_info(ui_info, timeout=timeout)
+    def click_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> bool:
+        ui = self.exist_by_find_info(ui_info, timeout=timeout)
         if ui:
             ui.click(focus=self.get_click_position_offset())
             return True
@@ -113,8 +123,8 @@ class DeviceFindView(DeviceBase):
             return False
 
     def example(self):
-        self.find_ui_and_click(
-            UITargetInfo(ConstViewType.Text, size=(0.1733, 0.0262), parent_name=ConstViewType.Linear))
+        self.click_by_find_info(
+            FindUITargetInfo(ConstViewType.Text, size=(0.1733, 0.0262), parent_name=ConstViewType.Linear))
 
     def find_all_contain_text(self, view_type: str, text: str, timeout=3) -> UIObjectProxy | None:
         types = self.poco(type=view_type).wait(timeout=timeout)

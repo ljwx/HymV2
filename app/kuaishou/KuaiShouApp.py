@@ -8,7 +8,7 @@ from apppackage.AppPackage import AppInfoKuaiShou
 from constant.Const import ConstViewType, ConstFlag
 from device.DeviceManager import DeviceManager
 from device.operation.UIOperation import UIOperation, Operation
-from device.uiview.UIInfo import UITargetInfo
+from device.uiview.FindUIInfo import FindUITargetInfo
 
 
 class KuaiShouApp(AppRunCommon):
@@ -26,7 +26,7 @@ class KuaiShouApp(AppRunCommon):
     def handle_launch_dialog(self):
         super().handle_launch_dialog()
         if self.device.exist_by_text("邀请2个新用户必得"):
-            close_icon = self.device.find_ui_by_info(UITargetInfo(ConstViewType.Image, (0.0758, 0.0340), (0.5, 0.7003)))
+            close_icon = self.device.exist_by_find_info(FindUITargetInfo(ConstViewType.Image, (0.0758, 0.0340), (0.5, 0.7003)))
             if close_icon:
                 close_icon.click(focus=self.device.get_click_position_offset())
         # if self.device.exist_by_flag("朋友推荐", 1):
@@ -76,8 +76,8 @@ class KuaiShouApp(AppRunCommon):
         go_success = UIOperation(True, Operation.Exist, "我的收益")
         balance = None
         if self.device.ui_operation_sequence(go_coin, go_success):
-            ui = self.device.find_ui_by_info(
-                UITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898)))
+            ui = self.device.exist_by_find_info(
+                FindUITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898)))
             if ui and ui.get_text():
                 balance = ui.get_text()
             self.device.press_back()

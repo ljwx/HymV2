@@ -1,5 +1,6 @@
 import ast
 import os
+from abc import abstractmethod
 from datetime import datetime
 from pathlib import Path
 from time import sleep
@@ -16,6 +17,7 @@ from poco.proxy import UIObjectProxy
 from constant.Const import ConstFlag
 from device.config.DeviceRandomConfig import DeviceRandomConfig
 from device.DeviceInfo import DeviceInfo
+from device.uiview.FindUIInfo import FindUITargetInfo
 from logevent.DeviceRunningLog import DeviceRunningLog
 from logevent.Log import Log
 
@@ -183,6 +185,9 @@ class DeviceBase(DeviceRandomConfig):
     def flag_is_position(self, flag: str) -> bool:
         return flag.startswith(ConstFlag.Position)
 
+    def flag_is_find_info(self, flag: FindUITargetInfo) -> bool:
+        return isinstance(flag, FindUITargetInfo)
+
     def __execute_exist_by_flag(self, flag: str, element: UIObjectProxy | None) -> UIObjectProxy | None:
         try:
             exist = element.exists()
@@ -250,20 +255,33 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists(f"{COLOR_RED}图片异常: {image_path}, 错误: {str(e)}, 详情: {error_detail}{COLOR_RESET}")
             return None
 
-    def exist_by_flag(self, flag: str, timeout: float = default_wait_view_timeout) -> bool:
-        if self.flag_is_id(flag):
-            if self.exist_by_id(flag, timeout=timeout):
-                return True
+    @abstractmethod
+    def exist_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> UIObjectProxy | None:
+        ...
+
+    def exist_by_flag(self, flag: str | FindUITargetInfo,
+                      timeout: float = default_wait_view_timeout) -> UIObjectProxy | None | tuple[float, float]:
+        if self.flag_is_find_info(flag):
+            ui = self.exist_by_find_info(flag, timeout=timeout)
+            if ui:
+                return ui
+        elif self.flag_is_id(flag):
+            ui = self.exist_by_id(flag, timeout=timeout)
+            if ui:
+                return ui
         elif self.flag_is_image(flag):
-            if self.exist_by_image(flag, timeout=timeout):
-                return True
+            ui = self.exist_by_image(flag, timeout=timeout)
+            if ui:
+                return ui
         elif self.flag_is_desc(flag):
-            if self.exist_by_desc(flag, timeout=timeout):
-                return True
+            ui = self.exist_by_desc(flag, timeout=timeout)
+            if ui:
+                return ui
         else:
-            if self.exist_by_text(flag, timeout=timeout):
-                return True
-        return False
+            ui = self.exist_by_text(flag, timeout=timeout)
+            if ui:
+                return ui
+        return None
 
     def __execute_click(self, flag: str, element: UIObjectProxy | None, double_check: bool = False) -> bool:
         if element is not None:
@@ -299,8 +317,14 @@ class DeviceBase(DeviceRandomConfig):
         # touch(template, timeout=timeout)
         return False
 
+    @abstractmethod
+    def click_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> bool:
+        ...
+
     def click_by_flag(self, flag: str, timeout=default_wait_view_timeout) -> bool:
-        if self.flag_is_id(flag):
+        if self.flag_is_find_info(flag):
+            return self.click_by_find_info(flag, timeout=timeout)
+        elif self.flag_is_id(flag):
             return self.click_by_id(flag, timeout=timeout)
         elif self.flag_is_image(flag):
             return self.click_by_image(flag, timeout=timeout)
