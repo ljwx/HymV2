@@ -11,26 +11,32 @@ from typing import Any
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 from logevent.Log import Log
+from utils.json_cache import JsonCacheUtils
 
-RED = '\033[91m'
+COLOR_RED = '\033[91m'
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
 BLUE = '\033[94m'
-RESET = '\033[0m'  # 重置颜色
+COLOR_RESET = '\033[0m'  # 重置颜色
 print_lock = threading.Lock()
 
 
 class AppRunBase(ABC):
-    first_check_in_probably = 0.3
-    execute_ad_reward_probably = 0.9
-
-    star_probable: float = 0.16
-    comment_probable: float = 0.11
-    works_probable: float = 0.25
-
     test_main_task_times = None
 
     def __init__(self, app_info: AppPackageInfo, device: DeviceManager):
+        def _get_value(key: str) -> float:
+            entry = JsonCacheUtils.get_flag(key, default=None, cache_path="run_config")
+            if isinstance(entry, dict):
+                return entry.get("value", 0.5)
+            return 0.5
+
+        # 读取概率配置，如缺失则使用 0.0 兜底，避免 None.get 报错
+        self.first_check_in_probably = _get_value("first_check_in_probably")
+        self.execute_ad_reward_probably = _get_value("execute_ad_reward_probably")
+        self.star_probable = _get_value("star_probable")
+        self.comment_probable = _get_value("comment_probable")
+        self.works_probable = _get_value("works_probable")
         self.app_info = app_info
         self.device = device
 
@@ -95,17 +101,21 @@ class AppRunBase(ABC):
         if not self.is_check_in():
             self.logd("现在执行签到")
             result = self.execute_check_in()
+            if result:
+                JsonCacheUtils.set_flag_today(self.app_info.name, True)
             self.logd("签到结果", result)
             if self.app_info.enable_balance:
                 self.logd("去获取余额")
                 balance = self.get_balance()
+                if balance:
+                    JsonCacheUtils.set_flag_today(self.app_info.name + ",b", balance, cache_path="balance")
                 self.logd("余额", balance)
             self.logd("===签到执行完毕===", "enter")
             return result
         return False
 
     def is_check_in(self) -> bool:
-        return True
+        return JsonCacheUtils.get_flag_today(self.app_info.name, False)
 
     @abstractmethod
     def execute_check_in(self) -> bool:
@@ -116,6 +126,8 @@ class AppRunBase(ABC):
 
         def task():
             self.logd("====开始单个任务====")
+            if JsonCacheUtils.get_flag("skip_main_task", False, cache_path="run_config"):
+                return
             self.every_time_clear()
             self.device.swipe_up()
             is_normal = self.main_task_item()

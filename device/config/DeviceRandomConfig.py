@@ -38,8 +38,8 @@ class DeviceRandomConfig(ABC):
         return x, y
 
     def get_touch_position_offset(self, pos: tuple[float, float]) -> tuple[float, float]:
-        x = pos[0] + random.uniform(-8, 8)
-        y = pos[1] + random.uniform(-8, 8)
+        x = pos[0] + random.uniform(-9, 9)
+        y = pos[1] + random.uniform(-9, 9)
         return x, y
 
     def _get_swipe_vertical_random_x(self) -> float:

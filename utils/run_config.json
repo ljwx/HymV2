@@ -1,0 +1,26 @@
+{
+  "first_check_in_probably": {
+    "value": 0.5,
+    "ts_str": "2025-12-15 16:45:44"
+  },
+  "execute_ad_reward_probably": {
+    "value": 0.8,
+    "ts_str": "2025-12-15 17:03:56"
+  },
+  "star_probable": {
+    "value": 0.17,
+    "ts_str": "2025-12-15 17:04:10"
+  },
+  "comment_probable": {
+    "value": 0.05,
+    "ts_str": "2025-12-15 17:04:22"
+  },
+  "works_probable": {
+    "value": 0.12,
+    "ts_str": "2025-12-15 17:04:34"
+  },
+  "skip_main_task": {
+    "value": true,
+    "ts_str": "2025-12-15 17:10:41"
+  }
+}
