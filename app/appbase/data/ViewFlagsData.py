@@ -18,15 +18,15 @@ class MainHomePageData:
 @dataclasses.dataclass
 class MainTaskPageData:
     first_go_home: bool
-    task_tab_flag: str|FindUITargetInfo
-    task_page_flag: str|FindUITargetInfo
+    task_tab_flag: str | FindUITargetInfo
+    task_page_flag: str | FindUITargetInfo
     task_page_ad_flag: list[str] | None
 
 
 @dataclasses.dataclass
 class MainTaskHumanData:
-    star_flag: str | None = None
-    comment_flag: str | None = None
-    go_works_flag: str | None = None
-    works_success_flag: str | None = None
-    works_list_flag: str | None = None
+    star_flag: str | None | FindUITargetInfo = None
+    comment_flag: str | None | FindUITargetInfo = None
+    go_works_flag: str | None | FindUITargetInfo = None
+    works_success_flag: str | None | FindUITargetInfo = None
+    works_list_flag: str | None | FindUITargetInfo = None

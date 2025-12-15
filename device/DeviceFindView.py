@@ -33,22 +33,6 @@ class DeviceFindView(DeviceBase):
             return position
         return None
 
-    def click_position_diff_by_id(self, resource_id: str, post: tuple[float, float], timeout=10) -> bool:
-        position = self._get_position_by_id(resource_id, timeout=timeout)
-        if position is None:
-            return False
-        x = post[0] + position[0]
-        y = post[1] + position[1]
-        return self.poco.click([x, y])
-
-    def click_position_diff_by_text(self, text: str, post: tuple[float, float], timeout=10) -> bool:
-        position = self._get_position_by_text(text, timeout=timeout)
-        if position is None:
-            return False
-        x = post[0] + position[0]
-        y = post[1] + position[1]
-        return self.poco.click([x, y])
-
     def find_child_form_parent_by_id(self, parent_id: str, child_index: int, timeout=10) -> UIObjectProxy | None:
         try:
             parent = self.poco(resourceId=parent_id).wait(timeout=timeout)
@@ -73,7 +57,7 @@ class DeviceFindView(DeviceBase):
         return None
 
     def __size_match(self, ui_size: tuple[float, float], info_size: tuple[float, float]) -> bool:
-        size_diff = 0.05
+        size_diff = 0.075
         width = abs(ui_size[0] - info_size[0]) < size_diff
         height = abs(ui_size[1] - info_size[1]) < size_diff
         return width and height

@@ -334,6 +334,7 @@ class DeviceBase(DeviceRandomConfig):
         elif self.flag_is_position(flag):
             pos_str = flag.replace(ConstFlag.Position, "")
             pos = tuple(ast.literal_eval(pos_str))
+            print("点击位置",pos)
             self.dev.touch(pos=self.get_touch_position_offset(pos), duration=self.get_touch_duration())
             return True
         else:

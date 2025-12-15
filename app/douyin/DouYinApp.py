@@ -43,7 +43,9 @@ class DouYinApp(AppRunCommon):
 
     def execute_check_in(self) -> bool:
         result = False
-        if self.device.click_by_flag(self.resource_dir + "check_in_btn.png"):
+        check_in_flag = FindUITargetInfo(ConstViewType.Group, size=(0.675, 0.0097), position=(0.5, 0.4307),
+                                         parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3})
+        if self.device.click_by_flag(check_in_flag):
             result = True
             self.device.sleep_operation_random()
             self.device.click_by_flag(self.resource_dir + "check_in_success_close_icon.png")
@@ -77,8 +79,10 @@ class DouYinApp(AppRunCommon):
             self.device.swipe_up()
             self.device.sleep_operation_random()
         normal, duration = asyncio.run(self.get_main_task_item_duration(ad_flag=ads, normal=nors, long_flag=lon))
-        if normal and random.random() < 0.1:
-            self.device.click_by_flag(self.resource_dir + "follow_user", 1)
+        if normal and random.random() < 0.012:
+            follow_button = FindUITargetInfo(ConstViewType.Image, size=(0.065, 0.0292), position=(0.9216, 0.4910),
+                                             parent_name=ConstViewType.Button, z_orders={'global': 0, 'local': 18})
+            self.device.click_by_flag(follow_button, 1)
         if self.device.exist_by_flag(exist_flag, 2):
             sleep(duration)
         else:
@@ -86,8 +90,12 @@ class DouYinApp(AppRunCommon):
         return normal
 
     def get_main_human_flag(self) -> MainTaskHumanData:
+        star = FindUITargetInfo(ConstViewType.Image, size=(0.0975, 0.043), position=(0.9141, 0.5438),
+                                parent_name=ConstViewType.Frame, z_orders={'global': 0, 'local': 1})
+        comment = FindUITargetInfo(ConstViewType.Image, size=(0.0975, 0.0438), position=(0.9141, 0.6277),
+                                   parent_name=ConstViewType.Frame, z_orders={'global': 0, 'local': 1})
         return MainTaskHumanData(
-            ConstFlag.Position + "[0.9133, 0.4898]", ConstFlag.Position + "[0.9133, 0.5737]",
+            star, comment,
             self.id_prefix + "user_avatar", "获赞",
             ConstViewType.Recycler)
 
@@ -96,11 +104,11 @@ class DouYinApp(AppRunCommon):
         def find_enter() -> bool | None:
             first = self.device.find_all_contain_name(ConstViewType.Group, "每20分钟完成一次广告任务", 2)
             if first:
-                first.click()
+                first.click(focus=self.device.get_click_position_offset())
                 return True
             second = self.device.find_all_contain_name(ConstViewType.Group, "看广告视频，", 2)
             if second:
-                second.click()
+                second.click(focus=self.device.get_click_position_offset())
                 return True
             return False
 
@@ -144,8 +152,10 @@ class DouYinApp(AppRunCommon):
             first_video()
             second_video()
             self.device.click_by_flag(self.id_prefix + "iv_back", 1)
-        self.device.click_by_flag(self.resource_dir + "close_video_ad_icon.png", 1)
-        self.device.click_by_flag(self.resource_dir + "close_video_ad_icon.png", 1)
+        close_ad_icon = FindUITargetInfo(ConstViewType.Image, size=(0.065, 0.0292), position=(0.8033, 0.3741),
+                                         parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3})
+        self.device.click_by_flag(close_ad_icon, 1)
+        self.device.click_by_flag(close_ad_icon, 1)
         return True
 
     def get_duration_reward(self) -> bool:

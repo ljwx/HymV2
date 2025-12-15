@@ -98,7 +98,7 @@ class KuaiShouApp(AppRunCommon):
             self.device.swipe_up()
             self.device.sleep_operation_random()
         normal, duration = asyncio.run(self.get_main_task_item_duration(ad_flag=ads, normal=nors, long_flag=lon))
-        if normal and random.random() < 0.015:
+        if normal and random.random() < 0.011:
             self.device.click_by_flag(self.id_prefix + "follow_button", 1)
         if self.device.exist_by_flag(self.id_prefix + "follow_avatar_view", 2):
             wait = UIOperation(True, Operation.Wait, "", exist_waite_time=duration)
