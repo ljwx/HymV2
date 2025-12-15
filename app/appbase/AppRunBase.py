@@ -22,16 +22,18 @@ print_lock = threading.Lock()
 
 
 class AppRunBase(ABC):
-    first_check_in_probably = 0.99
-    execute_ad_reward_probably = 0.9
-
-    star_probable: float = 0.16
-    comment_probable: float = 0.11
-    works_probable: float = 0.17
 
     test_main_task_times = None
 
     def __init__(self, app_info: AppPackageInfo, device: DeviceManager):
+        self.first_check_in_probably = JsonCacheUtils.get_flag("first_check_in_probably", cache_path="run_config").get(
+            "value")
+        self.execute_ad_reward_probably = JsonCacheUtils.get_flag("execute_ad_reward_probably",
+                                                                  cache_path="run_config").get("value")
+
+        self.star_probable = JsonCacheUtils.get_flag("star_probable", cache_path="run_config").get("value")
+        self.comment_probable = JsonCacheUtils.get_flag("comment_probable", cache_path="comment_probable").get("value")
+        self.works_probable = JsonCacheUtils.get_flag("works_probable", cache_path="works_probable").get("value")
         self.app_info = app_info
         self.device = device
 
@@ -103,7 +105,7 @@ class AppRunBase(ABC):
                 self.logd("去获取余额")
                 balance = self.get_balance()
                 if balance:
-                    JsonCacheUtils.set_flag_today(self.app_info.name + ",b", balance)
+                    JsonCacheUtils.set_flag_today(self.app_info.name + ",b", balance, cache_path="balance")
                 self.logd("余额", balance)
             self.logd("===签到执行完毕===", "enter")
             return result
@@ -121,6 +123,8 @@ class AppRunBase(ABC):
 
         def task():
             self.logd("====开始单个任务====")
+            if JsonCacheUtils.get_flag("skip_main_task", False, cache_path="run_config"):
+                return
             self.every_time_clear()
             self.device.swipe_up()
             is_normal = self.main_task_item()
