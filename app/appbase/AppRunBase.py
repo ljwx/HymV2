@@ -11,6 +11,7 @@ from typing import Any
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 from logevent.Log import Log
+from utils.json_cache import JsonCacheUtils
 
 RED = '\033[91m'
 GREEN = '\033[92m'
@@ -26,7 +27,7 @@ class AppRunBase(ABC):
 
     star_probable: float = 0.16
     comment_probable: float = 0.11
-    works_probable: float = 0.25
+    works_probable: float = 0.17
 
     test_main_task_times = None
 
@@ -95,6 +96,8 @@ class AppRunBase(ABC):
         if not self.is_check_in():
             self.logd("现在执行签到")
             result = self.execute_check_in()
+            if result:
+                JsonCacheUtils.set_flag_today(self.app_info.name, True)
             self.logd("签到结果", result)
             if self.app_info.enable_balance:
                 self.logd("去获取余额")
@@ -105,7 +108,7 @@ class AppRunBase(ABC):
         return False
 
     def is_check_in(self) -> bool:
-        return True
+        return JsonCacheUtils.get_flag_today(self.app_info.name, False)
 
     @abstractmethod
     def execute_check_in(self) -> bool:

@@ -15,5 +15,5 @@ def test_run(device: DeviceManager, app: DouYinApp):
     #     view.click()
 
 
-AppLaunch(callback=lambda device, app: test_run(device, app))
-# AppLaunch()
+# AppLaunch(callback=lambda device, app: test_run(device, app))
+AppLaunch()

@@ -7,6 +7,7 @@ from app.kuaishou.KuaiShouApp import KuaiShouApp
 from device.DeviceInfo import Mi15, HwP40
 from device.DeviceManager import DeviceManager
 from logevent.Log import Log
+from utils.json_cache import JsonCacheUtils
 
 
 class AppLaunch:
@@ -25,6 +26,7 @@ class AppLaunch:
             Log.d("device", "设备异常")
             return
         device.init_status()
+        JsonCacheUtils.prune(14)
         for app in self.get_apps(device):
             try:
                 if callback:
@@ -36,5 +38,5 @@ class AppLaunch:
                 traceback.print_exc()
 
     def get_apps(self, device: DeviceManager):
-        return [DouYinApp(device=device)]
+        # return [DouYinApp(device=device)]
         return [KuaiShouApp(device=device),DouYinApp(device=device)]
