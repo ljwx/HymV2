@@ -20,7 +20,7 @@
     "ts_str": "2025-12-15 17:04:34"
   },
   "skip_main_task": {
-    "value": true,
+    "value": false,
     "ts_str": "2025-12-15 17:10:41"
   }
 }

@@ -126,7 +126,7 @@ class AppRunBase(ABC):
 
         def task():
             self.logd("====开始单个任务====")
-            if JsonCacheUtils.get_flag("skip_main_task", False, cache_path="run_config"):
+            if JsonCacheUtils.get_flag("skip_main_task", False, cache_path="run_config").get("value"):
                 return
             self.every_time_clear()
             self.device.swipe_up()
