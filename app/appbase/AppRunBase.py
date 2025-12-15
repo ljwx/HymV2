@@ -22,18 +22,21 @@ print_lock = threading.Lock()
 
 
 class AppRunBase(ABC):
-
     test_main_task_times = None
 
     def __init__(self, app_info: AppPackageInfo, device: DeviceManager):
-        self.first_check_in_probably = JsonCacheUtils.get_flag("first_check_in_probably", cache_path="run_config").get(
-            "value")
-        self.execute_ad_reward_probably = JsonCacheUtils.get_flag("execute_ad_reward_probably",
-                                                                  cache_path="run_config").get("value")
+        def _get_value(key: str) -> float:
+            entry = JsonCacheUtils.get_flag(key, default=None, cache_path="run_config")
+            if isinstance(entry, dict):
+                return entry.get("value", 0.5)
+            return 0.5
 
-        self.star_probable = JsonCacheUtils.get_flag("star_probable", cache_path="run_config").get("value")
-        self.comment_probable = JsonCacheUtils.get_flag("comment_probable", cache_path="comment_probable").get("value")
-        self.works_probable = JsonCacheUtils.get_flag("works_probable", cache_path="works_probable").get("value")
+        # 读取概率配置，如缺失则使用 0.0 兜底，避免 None.get 报错
+        self.first_check_in_probably = _get_value("first_check_in_probably")
+        self.execute_ad_reward_probably = _get_value("execute_ad_reward_probably")
+        self.star_probable = _get_value("star_probable")
+        self.comment_probable = _get_value("comment_probable")
+        self.works_probable = _get_value("works_probable")
         self.app_info = app_info
         self.device = device
 
