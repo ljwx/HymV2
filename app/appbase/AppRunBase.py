@@ -11,22 +11,23 @@ from typing import Any
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 from logevent.Log import Log
+from utils.json_cache import JsonCacheUtils
 
-RED = '\033[91m'
+COLOR_RED = '\033[91m'
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
 BLUE = '\033[94m'
-RESET = '\033[0m'  # 重置颜色
+COLOR_RESET = '\033[0m'  # 重置颜色
 print_lock = threading.Lock()
 
 
 class AppRunBase(ABC):
-    first_check_in_probably = 0.3
+    first_check_in_probably = 0.99
     execute_ad_reward_probably = 0.9
 
     star_probable: float = 0.16
     comment_probable: float = 0.11
-    works_probable: float = 0.25
+    works_probable: float = 0.17
 
     test_main_task_times = None
 
@@ -95,17 +96,21 @@ class AppRunBase(ABC):
         if not self.is_check_in():
             self.logd("现在执行签到")
             result = self.execute_check_in()
+            if result:
+                JsonCacheUtils.set_flag_today(self.app_info.name, True)
             self.logd("签到结果", result)
             if self.app_info.enable_balance:
                 self.logd("去获取余额")
                 balance = self.get_balance()
+                if balance:
+                    JsonCacheUtils.set_flag_today(self.app_info.name + ",b", balance)
                 self.logd("余额", balance)
             self.logd("===签到执行完毕===", "enter")
             return result
         return False
 
     def is_check_in(self) -> bool:
-        return True
+        return JsonCacheUtils.get_flag_today(self.app_info.name, False)
 
     @abstractmethod
     def execute_check_in(self) -> bool:

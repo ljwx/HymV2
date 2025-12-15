@@ -140,6 +140,7 @@ class KuaiShouApp(AppRunCommon):
             return False
 
         def second_video() -> bool:
+            self.device.sleep_operation_random()
             if self.device.click_by_flag("领取奖励", 4):
                 self.device.sleep_task_random(3)
                 first_video()

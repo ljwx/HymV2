@@ -19,6 +19,11 @@ from device.DeviceInfo import DeviceInfo
 from logevent.DeviceRunningLog import DeviceRunningLog
 from logevent.Log import Log
 
+COLOR_RED = '\033[91m'
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+BLUE = '\033[94m'
+COLOR_RESET = '\033[0m'  # 重置颜色
 
 class DeviceBase(DeviceRandomConfig):
     dev: Android  # Android(serial="192.168.1.100:5555")
@@ -197,7 +202,7 @@ class DeviceBase(DeviceRandomConfig):
                     self.logd("多个:" + resource_id, i.get_position())
             return self.__execute_exist_by_flag(resource_id, element)
         except Exception as e:
-            Log.d_view_exists("id:" + resource_id + "，异常：" + e)
+            Log.d_view_exists(f"{COLOR_RED}id:{resource_id}，异常：{e}{COLOR_RESET}")
             return None
 
     def exist_by_text(self, text: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
@@ -208,7 +213,7 @@ class DeviceBase(DeviceRandomConfig):
                     self.logd("多个:" + text, i.get_position())
             return self.__execute_exist_by_flag(text, element)
         except Exception as e:
-            Log.d_view_exists("text:" + text + "，异常：" + e)
+            Log.d_view_exists(f"{COLOR_RED}text:{text}，异常：{e}{COLOR_RESET}")
             return None
 
     def exist_by_desc(self, desc: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
@@ -219,7 +224,7 @@ class DeviceBase(DeviceRandomConfig):
                     self.logd("多个desc:" + desc, i.get_position())
             return self.__execute_exist_by_flag(desc, element)
         except Exception as e:
-            Log.d_view_exists("desc:" + desc + "，异常：" + e)
+            Log.d_view_exists(f"{COLOR_RED}desc:{desc}，异常：{e}{COLOR_RESET}")
             return None
 
     def exist_by_image(self, image_path: str, threshold=0.75, timeout: float = default_wait_view_timeout) -> \
@@ -242,7 +247,7 @@ class DeviceBase(DeviceRandomConfig):
         except Exception as e:
             import traceback
             error_detail = traceback.format_exc()
-            Log.d_view_exists(f"图片异常: {image_path}, 错误: {str(e)}, 详情: {error_detail}")
+            Log.d_view_exists(f"{COLOR_RED}图片异常: {image_path}, 错误: {str(e)}, 详情: {error_detail}{COLOR_RESET}")
             return None
 
     def exist_by_flag(self, flag: str, timeout: float = default_wait_view_timeout) -> bool:

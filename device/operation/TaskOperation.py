@@ -13,3 +13,4 @@ class TaskOperation(TaskRandomConfig):
         Log.d("主任务次数", str(times))
         for i in range(times):
             callback()
+            Log.d("主任务次数剩", str(times - i - 1))
