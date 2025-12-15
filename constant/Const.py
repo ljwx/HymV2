@@ -3,6 +3,7 @@ class ConstViewType:
     Text = "android.widget.TextView"
     Button = "android.widget.Button"
     Image = "android.widget.ImageView"
+    Texture = "android.view.TextureView"
     Relative = "android.widget.RelativeLayout"
     Linear = "android.widget.LinearLayout"
     Group = "android.view.ViewGroup"

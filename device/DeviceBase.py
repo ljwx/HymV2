@@ -27,6 +27,7 @@ YELLOW = '\033[93m'
 BLUE = '\033[94m'
 COLOR_RESET = '\033[0m'  # 重置颜色
 
+
 class DeviceBase(DeviceRandomConfig):
     dev: Android  # Android(serial="192.168.1.100:5555")
     poco: AndroidUiautomationPoco
@@ -321,7 +322,7 @@ class DeviceBase(DeviceRandomConfig):
     def click_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> bool:
         ...
 
-    def click_by_flag(self, flag: str, timeout=default_wait_view_timeout) -> bool:
+    def click_by_flag(self, flag: str | FindUITargetInfo, timeout=default_wait_view_timeout) -> bool:
         if self.flag_is_find_info(flag):
             return self.click_by_find_info(flag, timeout=timeout)
         elif self.flag_is_id(flag):

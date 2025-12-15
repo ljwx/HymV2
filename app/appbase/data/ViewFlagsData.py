@@ -1,5 +1,7 @@
 import dataclasses
 
+from device.uiview.FindUIInfo import FindUITargetInfo
+
 
 @dataclasses.dataclass
 class AppLaunchDialogData:
@@ -16,8 +18,8 @@ class MainHomePageData:
 @dataclasses.dataclass
 class MainTaskPageData:
     first_go_home: bool
-    task_tab_flag: str
-    task_page_flag: str
+    task_tab_flag: str|FindUITargetInfo
+    task_page_flag: str|FindUITargetInfo
     task_page_ad_flag: list[str] | None
 
 

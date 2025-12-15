@@ -99,7 +99,7 @@ class DeviceFindView(DeviceBase):
                     position_match = False
             if ui_info.parent_name is not None:
                 parent = type.parent()
-                if not parent.exists() or not parent.get_name() == ui_info.parent_name:
+                if not parent.exists() or not parent.attr("type") == ui_info.parent_name:
                     parent_match = False
             if ui_info.z_orders is not None:
                 z_orders_match = False
@@ -112,6 +112,8 @@ class DeviceFindView(DeviceBase):
             if size_match and position_match and parent_match and z_orders_match:
                 self.logd("通过ui_info找到了ui", str(ui_info.desc) if ui_info.desc is not None else "")
                 return type
+            # if size_match and position_match:
+            #     print(zord, type.parent().attr("type"))
         return None
 
     def click_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> bool:

@@ -59,7 +59,10 @@ class AppRunCommon(AppRunBase):
         flag = self.get_task_page_flag()
         if flag.first_go_home:
             self.go_main_home_page()
-        if self.device.flag_is_image(flag.task_tab_flag):
+        if self.device.flag_is_find_info(flag.task_tab_flag):
+            if self.device.click_by_flag(flag.task_tab_flag, 1):
+                sleep(4)
+        elif self.device.flag_is_image(flag.task_tab_flag):
             if self.device.click_by_flag(flag.task_tab_flag, 1):
                 sleep(4)
         else:

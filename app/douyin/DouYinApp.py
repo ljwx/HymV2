@@ -35,8 +35,10 @@ class DouYinApp(AppRunCommon):
         return MainHomePageData(self.id_prefix + "root_view", "首页", None)
 
     def get_task_page_flag(self) -> MainTaskPageData:
-        task_tab_icon = self.resource_dir + "main_task_tab.png"
-        task_page_success = self.resource_dir + "task_page_success_icon.png"
+        task_tab_icon = FindUITargetInfo(ConstViewType.Image, size=(0.1025, 0.0449), position=(0.4991, 0.9445),
+                                         parent_name=ConstViewType.Frame, z_orders={'global': 0, 'local': 2})
+        task_page_success = FindUITargetInfo(ConstViewType.Texture, size=(0.2641, 0.071), position=(0.8475, 0.8962),
+                                             parent_name=ConstViewType.Frame, z_orders={'global': 0, 'local': 1})
         return MainTaskPageData(True, task_tab_icon, task_page_success, [self.close_icon])
 
     def execute_check_in(self) -> bool:
