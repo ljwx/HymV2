@@ -67,9 +67,9 @@ class DouYinApp(AppRunCommon):
 
     def main_task_item(self):
         exist_flag = self.id_prefix + "user_avatar"
-        ads = [ConstFlag.Desc + "当前直播间可用"]
-        nors = [ConstFlag.Desc + "音乐，@🧊创作的原声，按钮", "全屏观看", "相关搜索", "拍同款"]
-        lon = ["点击进入看全集", "听抖音"]
+        ads = [ConstFlag.Desc + "当前直播间可用", "广告", ConstFlag.Desc + "查看详情", ConstFlag.Desc + "立即下载"]
+        nors = [ConstFlag.Desc + "音乐，@🧊创作的原声，按钮", "全屏观看", "拍同款"]
+        lon = ["点击进入看全集", "听抖音", "合集"]
         if not self.device.exist_by_flag(exist_flag, 1.5):
             self.logd("非正常item，下一个")
             self.device.swipe_up()
