@@ -55,8 +55,7 @@ class DouYinApp(AppRunCommon):
         success_flag = FindUITargetInfo(ConstViewType.Group, size=(0.6183, 0.0550), position=(0.5, 0.6318),
                                         parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 1}, )
         if self.device.exist_by_flag(check_in_flag, 4):
-
-            if self.device.click_by_flag(self.resource_dir + "check_in_success_close_icon.png"):
+            if self.device.click_by_flag(self.resource_dir + "check_in_success_close_icon.png", 2):
                 self.device.sleep_operation_random()
                 result = True
 
