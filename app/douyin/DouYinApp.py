@@ -52,10 +52,18 @@ class DouYinApp(AppRunCommon):
         check_in_flag = FindUITargetInfo(ConstViewType.Group, size=(0.675, 0.0097), position=(0.5, 0.4307),
                                          parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3},
                                          desc="进度条")
-        if self.device.click_by_flag(check_in_flag):
+        success_flag = FindUITargetInfo(ConstViewType.Group, size=(0.6183, 0.0550), position=(0.5, 0.6318),
+                                        parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 1}, )
+        if self.device.exist_by_flag(check_in_flag, 4):
             result = True
             self.device.sleep_operation_random()
             self.device.click_by_flag(self.resource_dir + "check_in_success_close_icon.png")
+        standby_flag = FindUITargetInfo(ConstViewType.Group, size=(0.1975, 0.0404), position=(0.8583, 0.3516),
+                                        parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 4},
+                                        desc="主动签到")
+        self.device.click_by_flag(standby_flag, 2)
+        if self.device.exist_by_flag(success_flag, 4):
+            result = True
         return result
 
     def execute_get_balance(self) -> str | None:
