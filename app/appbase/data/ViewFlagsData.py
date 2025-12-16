@@ -20,7 +20,7 @@ class MainTaskPageData:
     first_go_home: bool
     task_tab_flag: str | FindUITargetInfo
     task_page_flag: str | FindUITargetInfo
-    task_page_ad_flag: list[str] | None
+    task_page_ad_flag: list[str | FindUITargetInfo] | None
 
 
 @dataclasses.dataclass
