@@ -36,15 +36,17 @@ class DouYinApp(AppRunCommon):
 
     def get_task_page_flag(self) -> MainTaskPageData:
         task_tab_icon = FindUITargetInfo(ConstViewType.Image, size=(0.1025, 0.0449), position=(0.4991, 0.9445),
-                                         parent_name=ConstViewType.Frame, z_orders={'global': 0, 'local': 2})
+                                         parent_name=ConstViewType.Frame, z_orders={'global': 0, 'local': 2},
+                                         desc="福袋")
         task_page_success = FindUITargetInfo(ConstViewType.Texture, size=(0.2641, 0.071), position=(0.8475, 0.8962),
-                                             parent_name=ConstViewType.Frame, z_orders={'global': 0, 'local': 1})
+                                             parent_name=ConstViewType.Frame, z_orders={'global': 0, 'local': 1},
+                                             desc="宝箱")
         return MainTaskPageData(True, task_tab_icon, task_page_success, [self.close_icon])
 
     def execute_check_in(self) -> bool:
         result = False
         check_in_flag = FindUITargetInfo(ConstViewType.Group, size=(0.675, 0.0097), position=(0.5, 0.4307),
-                                         parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3})
+                                         parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3}, desc="进度条")
         if self.device.click_by_flag(check_in_flag):
             result = True
             self.device.sleep_operation_random()
@@ -64,7 +66,7 @@ class DouYinApp(AppRunCommon):
         if self.device.ui_operation_sequence(go_coin, go_success):
             ui = self.device.exist_by_find_info(
                 FindUITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898)))
-            if ui and ui.get_text():
+            if ui is not None and ui.get_text():
                 balance = ui.get_text()
             self.device.press_back()
         return balance
@@ -103,11 +105,11 @@ class DouYinApp(AppRunCommon):
 
         def find_enter() -> bool | None:
             first = self.device.find_all_contain_name(ConstViewType.Group, "每20分钟完成一次广告任务", 2)
-            if first:
+            if first is not None:
                 first.click(focus=self.device.get_click_position_offset())
                 return True
             second = self.device.find_all_contain_name(ConstViewType.Group, "看广告视频，", 2)
-            if second:
+            if second is not None:
                 second.click(focus=self.device.get_click_position_offset())
                 return True
             return False
@@ -135,7 +137,7 @@ class DouYinApp(AppRunCommon):
                 self.device.sleep_operation_random(random.randint(33, 39))
                 ad_page_back()
                 close_flag = self.device.find_all_contain_name(ConstViewType.Group, "领取成功，关闭，按钮", 4)
-                if close_flag:
+                if close_flag is not None:
                     ad_page_back()
                     close_flag.click(focus=self.device.get_click_position_offset())
                     ad_page_back()

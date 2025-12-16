@@ -27,7 +27,7 @@ class KuaiShouApp(AppRunCommon):
         super().handle_launch_dialog()
         if self.device.exist_by_text("邀请2个新用户必得"):
             close_icon = self.device.exist_by_find_info(FindUITargetInfo(ConstViewType.Image, (0.0758, 0.0340), (0.5, 0.7003)))
-            if close_icon:
+            if close_icon is not None:
                 close_icon.click(focus=self.device.get_click_position_offset())
         # if self.device.exist_by_flag("朋友推荐", 1):
         #     self.device.click_by_flag("com.kuaishou.nebula:id/close_btn", 2)
@@ -78,7 +78,7 @@ class KuaiShouApp(AppRunCommon):
         if self.device.ui_operation_sequence(go_coin, go_success):
             ui = self.device.exist_by_find_info(
                 FindUITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898)))
-            if ui and ui.get_text():
+            if ui is not None and ui.get_text():
                 balance = ui.get_text()
             self.device.press_back()
         return balance
@@ -171,17 +171,17 @@ class KuaiShouApp(AppRunCommon):
         if not self.go_task_page():
             return False
         trigger1 = self.device.find_all_contain_text(ConstViewType.Text, "金币立即领取", timeout=3)
-        if trigger1:
+        if trigger1 is not None:
             trigger1.click(focus=self.device.get_click_position_offset())
             if self.device.exist_by_flag("任务完成奖励"):
                 self.device.click_by_flag(self.close_icon, timeout=2)
         ui_trigger = self.device.find_all_contain_text(ConstViewType.Button, "点可领", timeout=2)
-        if ui_trigger:
+        if ui_trigger is not None:
             ui_trigger.click(focus=self.device.get_click_position_offset())
             sleep(3)
             if random.random() < 0.5:
                 ad = self.device.find_all_contain_text(ConstViewType.Button, "去看广告得最高", timeout=5)
-                if ad:
+                if ad is not None:
                     ad.click(focus=self.device.get_click_position_offset())
                     self.reward_ad_video_item()
                     self.device.click_by_id("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder",

@@ -1,10 +1,15 @@
 import ast
 import os
+import warnings
 from abc import abstractmethod
 from datetime import datetime
 from pathlib import Path
 from time import sleep
 
+# 抑制 ADBCAP 效率警告（已知权衡：更隐蔽但更慢）
+warnings.filterwarnings("ignore", message="Currently using ADB screenshots")
+
+from PIL import Image
 from airtest.core.android.android import Android
 from airtest.core.api import wait
 from airtest.core.error import TargetNotFoundError
@@ -35,6 +40,7 @@ class DeviceBase(DeviceRandomConfig):
 
     default_wait_view_timeout = 8
     _project_root: Path | None = None  # 缓存项目根目录
+    debug_multiple_elements = False  # 调试开关：是否检查多元素匹配（会增加 RPC 耗时）
 
     screen_size = None
 
@@ -44,7 +50,10 @@ class DeviceBase(DeviceRandomConfig):
         print("开始连接")
         self.device_ready = False
         try:
-            self.dev = Android(serialno=device_info.serial_no)
+            self.dev = Android(
+                serialno=device_info.serial_no,
+                cap_method="ADBCAP"  # 使用系统原生截图，更隐蔽
+            )
             # 将设备注册到 Airtest 全局设备管理器（poco 使用 use_airtest_input=True 时需要）
             G.DEVICE = self.dev
             self.poco = AndroidUiautomationPoco(
@@ -203,7 +212,7 @@ class DeviceBase(DeviceRandomConfig):
     def exist_by_id(self, resource_id: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
             element = self.poco(resourceId=resource_id).wait(timeout=timeout)
-            if len(element) > 1:
+            if self.debug_multiple_elements and len(element) > 1:
                 for i in element:
                     self.logd("多个:" + resource_id, i.get_position())
             return self.__execute_exist_by_flag(resource_id, element)
@@ -214,7 +223,7 @@ class DeviceBase(DeviceRandomConfig):
     def exist_by_text(self, text: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
             element = self.poco(text=text).wait(timeout=timeout)
-            if len(element) > 1:
+            if self.debug_multiple_elements and len(element) > 1:
                 for i in element:
                     self.logd("多个:" + text, i.get_position())
             return self.__execute_exist_by_flag(text, element)
@@ -225,7 +234,7 @@ class DeviceBase(DeviceRandomConfig):
     def exist_by_desc(self, desc: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
             element = self.poco(desc=desc.replace(ConstFlag.Desc, "")).wait(timeout=timeout)
-            if len(element) > 1:
+            if self.debug_multiple_elements and len(element) > 1:
                 for i in element:
                     self.logd("多个desc:" + desc, i.get_position())
             return self.__execute_exist_by_flag(desc, element)
@@ -264,23 +273,23 @@ class DeviceBase(DeviceRandomConfig):
                       timeout: float = default_wait_view_timeout) -> UIObjectProxy | None | tuple[float, float]:
         if self.flag_is_find_info(flag):
             ui = self.exist_by_find_info(flag, timeout=timeout)
-            if ui:
+            if ui is not None:
                 return ui
         elif self.flag_is_id(flag):
             ui = self.exist_by_id(flag, timeout=timeout)
-            if ui:
+            if ui is not None:
                 return ui
         elif self.flag_is_image(flag):
             ui = self.exist_by_image(flag, timeout=timeout)
-            if ui:
+            if ui is not None:
                 return ui
         elif self.flag_is_desc(flag):
             ui = self.exist_by_desc(flag, timeout=timeout)
-            if ui:
+            if ui is not None:
                 return ui
         else:
             ui = self.exist_by_text(flag, timeout=timeout)
-            if ui:
+            if ui is not None:
                 return ui
         return None
 
@@ -334,7 +343,7 @@ class DeviceBase(DeviceRandomConfig):
         elif self.flag_is_position(flag):
             pos_str = flag.replace(ConstFlag.Position, "")
             pos = tuple(ast.literal_eval(pos_str))
-            print("点击位置",pos)
+            print("点击位置", pos)
             self.dev.touch(pos=self.get_touch_position_offset(pos), duration=self.get_touch_duration())
             return True
         else:
@@ -342,7 +351,7 @@ class DeviceBase(DeviceRandomConfig):
 
     def is_text_selected(self, text: str) -> bool:
         ui = self.exist_by_text(text)
-        if ui:
+        if ui is not None:
             selected = ui.attr("selected")
             self.logd(text, "是否选中", selected)
             return selected
@@ -384,3 +393,51 @@ class DeviceBase(DeviceRandomConfig):
         now = datetime.now()
         formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
         print(Log.filter, formatted_time, *content)
+
+    def screenshot(self, save_path: str = None, ui: UIObjectProxy = None, 
+                   quality: int = 10, scale: float = 0.4) -> Image.Image | None:
+        """
+        截图：传 ui 则按元素区域裁剪，否则全屏
+        Args:
+            save_path: 相对路径如 "base/111.jpg"，自动存到项目目录下（推荐用 .jpg 可压缩）
+            ui: 元素对象（可选），传则裁剪该元素区域
+            quality: 截图质量 1-100，默认 10（仅对 JPEG 格式有效）
+            scale: 缩放比例 0.1-1.0，默认 0.4（越小文件越小，0.4 表示缩小到 40%）
+        """
+        try:
+            self.logd("开始截图", save_path if save_path else "")
+            raw = self.dev.snapshot()
+            if raw is None:
+                return None
+            img = Image.fromarray(raw)
+            
+            # 缩放图片（提升处理速度）
+            if scale < 1.0:
+                new_size = (int(img.width * scale), int(img.height * scale))
+                img = img.resize(new_size, Image.Resampling.LANCZOS)
+            
+            if ui is not None:
+                try:
+                    top, right, bottom, left = ui.get_bounds()
+                    w, h = img.size
+                    x0, y0 = int(left * w), int(top * h)
+                    x1, y1 = int(right * w), int(bottom * h)
+                    if x1 > x0 and y1 > y0:
+                        img = img.crop((x0, y0, x1, y1))
+                    else:
+                        self.logd(f"裁剪坐标无效: ({x0},{y0}) -> ({x1},{y1})，返回全屏截图")
+                except Exception as e:
+                    self.logd(f"获取元素边界失败: {e}，返回全屏截图")
+            if save_path:
+                full = self._find_project_root() / save_path
+                full.parent.mkdir(parents=True, exist_ok=True)
+                # JPEG 格式支持 quality 压缩，PNG 是无损格式不支持
+                if save_path.lower().endswith(('.jpg', '.jpeg')):
+                    img.save(str(full), quality=quality)
+                else:
+                    img.save(str(full))
+            self.logd("截图完成", save_path if save_path else "")
+            return img
+        except Exception as e:
+            self.logd(f"截图异常: {e}")
+            return None

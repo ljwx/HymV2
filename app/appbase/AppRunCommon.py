@@ -154,7 +154,7 @@ class AppRunCommon(AppRunBase):
             if self.device.ui_operation_sequence(go_works_list, works_list_success):
                 for i in range(random.randint(1, 5)):
                     item = self.device.find_list_by_child(flag.works_list_flag)
-                    if item and item.exists():
+                    if item is not None and item.exists():
                         try:
                             self.device.sleep_operation_random()
                             item.click(focus=self.device.get_click_position_offset())

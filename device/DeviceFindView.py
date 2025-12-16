@@ -102,7 +102,7 @@ class DeviceFindView(DeviceBase):
 
     def click_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> bool:
         ui = self.exist_by_find_info(ui_info, timeout=timeout)
-        if ui:
+        if ui is not None:
             ui.click(focus=self.get_click_position_offset())
             return True
         else:
@@ -114,8 +114,6 @@ class DeviceFindView(DeviceBase):
 
     def find_all_contain_text(self, view_type: str, text: str, timeout=3) -> UIObjectProxy | None:
         types = self.poco(type=view_type).wait(timeout=timeout)
-        if not types:
-            return None
         for ui in types:
             ui_text = ui.get_text()
             if ui_text and text in ui_text:
@@ -125,8 +123,6 @@ class DeviceFindView(DeviceBase):
 
     def find_all_contain_name(self, view_type: str, text: str, timeout=3) -> UIObjectProxy | None:
         types = self.poco(type=view_type).wait(timeout=timeout)
-        if not types:
-            return None
         for ui in types:
             ui_text = ui.get_name()
             if ui_text and text in ui_text:
@@ -137,24 +133,24 @@ class DeviceFindView(DeviceBase):
     def find_list_by_flag(self, flag: str, timeout=3) -> UIObjectProxy | None:
         if self.flag_is_id(flag):
             types = self.poco(name=flag).wait(timeout=timeout)
-            if types and len(types) > 0:
+            if len(types) > 0:
                 index = random.randint(0, len(types) - 1)
                 return types[index]
         elif self.flag_is_desc(flag):
             types = self.poco(desc=flag.replace(ConstFlag.Desc)).wait(timeout=timeout)
-            if types and len(types) > 0:
+            if len(types) > 0:
                 index = random.randint(0, len(types) - 1)
                 return types[index]
         else:
             types = self.poco(text=flag).wait(timeout=timeout)
-            if types and len(types) > 0:
+            if len(types) > 0:
                 index = random.randint(0, len(types) - 1)
                 return types[index]
         return None
 
     def __find_recycler_view(self, timeout) -> UIObjectProxy | None:
         ui = self.poco(type=ConstViewType.Recycler).wait(timeout=timeout)
-        if ui:
+        if ui is not None:
             return ui
         return None
 
@@ -163,15 +159,15 @@ class DeviceFindView(DeviceBase):
             parent = None
             if flag.__contains__("widget.RecyclerView"):
                 ui = self.__find_recycler_view(timeout)
-                if ui:
+                if ui is not None:
                     parent = ui
             else:
                 parent = self.poco(resourceId=flag).wait(timeout=timeout)
-            if parent and parent.exists():
+            if parent is not None and parent.exists():
                 children = parent.children()
-                if children and len(children) > 0:
+                if len(children) > 0:
                     index = random.randint(0, len(children) - 1)
                     return children[index]
         except Exception as e:
-            print("查找子view异常", e)
+            self.logd("查找子view异常", str(e))
         return None
