@@ -26,7 +26,8 @@ class KuaiShouApp(AppRunCommon):
     def handle_launch_dialog(self):
         super().handle_launch_dialog()
         if self.device.exist_by_text("邀请2个新用户必得"):
-            close_icon = self.device.exist_by_find_info(FindUITargetInfo(ConstViewType.Image, (0.0758, 0.0340), (0.5, 0.7003)))
+            close_icon = self.device.exist_by_find_info(
+                FindUITargetInfo(ConstViewType.Image, (0.0758, 0.0340), (0.5, 0.7003)))
             if close_icon is not None:
                 close_icon.click(focus=self.device.get_click_position_offset())
         # if self.device.exist_by_flag("朋友推荐", 1):
@@ -134,7 +135,7 @@ class KuaiShouApp(AppRunCommon):
 
         def first_video() -> bool:
             if self.device.exist_by_flag(self.ad_id_prefix + "video_countdown", 6):
-                self.device.sleep_task_random(33)
+                self.device.sleep_task_random(35)
                 self.device.click_by_flag(close_flag)
                 return True
             return False
@@ -165,6 +166,7 @@ class KuaiShouApp(AppRunCommon):
         self.device.click_by_flag(close_view, 1)
         self.device.click_by_flag("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder", 1)
         self.device.click_by_flag(close_view, 1)
+        self.device.click_by_flag("退出直播间", 1)
         return True
 
     def get_duration_reward(self) -> bool:
@@ -190,6 +192,16 @@ class KuaiShouApp(AppRunCommon):
                 self.device.click_by_image(self.close_icon, timeout=2)
             return True
         return False
+
+    def other_reward_task1(self) -> bool:
+        go = self.device.click_by_flag("到饭点领饭补", timeout=3)
+        if go:
+            if self.device.click_by_flag("看广告", 4):
+                self.reward_ad_video_item()
+
+            if self.device.click_by_flag("看广告领饭补", 3):
+                self.reward_ad_video_item()
+                self.device.press_back()
 
     def every_time_clear(self):
         pass
