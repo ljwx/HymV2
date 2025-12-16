@@ -12,7 +12,7 @@ class TaskRandomConfig:
         return main_task_count
 
     def get_main_task_duration(self, rate=1) -> float:
-        main_task_duration = random.uniform(2.5, 20.5)
+        main_task_duration = random.uniform(4.5, 20.5)
         return main_task_duration
 
     def get_main_task_duration_with_movie(self) -> float:

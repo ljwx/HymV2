@@ -2,5 +2,9 @@
   "douyin": {
     "value": true,
     "ts_str": "2025-12-16 17:16:27"
+  },
+  "kuaishou": {
+    "value": true,
+    "ts_str": "2025-12-16 17:33:28"
   }
 }

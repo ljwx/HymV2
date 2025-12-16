@@ -81,7 +81,7 @@ class AppRunCommon(AppRunBase):
 
     async def get_main_task_item_duration(self, ad_flag: list[str], normal: list[str], long_flag: list[str]) -> tuple[
         bool, float]:
-        default_duration = self.device.task_operation.get_main_task_duration_with_ad()
+        default_duration = self.device.task_operation.get_main_task_duration()
         default_result = (False, default_duration)
         IS_AD = "AD"
         IS_NORMAL = "NORMAL"

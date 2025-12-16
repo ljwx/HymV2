@@ -97,6 +97,9 @@ class AppRunBase(ABC):
     def go_task_page(self) -> bool:
         ...
 
+    def temp_execute(self) -> bool:
+        self.__check_in()
+
     def __check_in(self) -> bool:
         self.logd("===准备签到===")
         if not self.__is_check_in():
