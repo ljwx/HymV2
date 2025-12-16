@@ -8,7 +8,7 @@ from app.kuaishou.KuaiShouApp import KuaiShouApp
 from device.DeviceInfo import Mi15, HwP40
 from device.DeviceManager import DeviceManager
 from logevent.Log import Log
-from utils.json_cache import JsonCacheUtils
+from utils.JsonCacheUtils import JsonCacheUtils
 
 
 class AppLaunch:

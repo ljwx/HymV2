@@ -11,7 +11,7 @@ from typing import Any
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 from logevent.Log import Log
-from utils.json_cache import JsonCacheUtils
+from utils.JsonCacheUtils import JsonCacheUtils
 
 COLOR_RED = '\033[91m'
 GREEN = '\033[92m'
@@ -40,6 +40,9 @@ class AppRunBase(ABC):
         self.app_info = app_info
         self.device = device
 
+    def get_today_file_name(self) -> str:
+        return datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+
     def launch_app(self) -> bool:
         try:
             self.logd("启动")
@@ -60,8 +63,9 @@ class AppRunBase(ABC):
         self.handle_launch_dialog()
 
         def check_in() -> bool:
-            if not self.is_check_in() and self.go_task_page():
-                self.check_in()
+            if not self.__is_check_in() and self.go_task_page():
+                self.__check_in()
+                self.__get_balance()
 
         if first_check_in:
             check_in()
@@ -69,6 +73,7 @@ class AppRunBase(ABC):
             self.main_task_loop()
         if not first_check_in:
             check_in()
+        self.__get_balance()
         self.logd("===获取时间段奖励===")
         self.get_duration_reward()
         self.logd("===时间段奖励结束===", "enter")
@@ -92,33 +97,41 @@ class AppRunBase(ABC):
     def go_task_page(self) -> bool:
         ...
 
-    @abstractmethod
-    def get_balance(self) -> str | None:
-        ...
-
-    def check_in(self) -> bool:
+    def __check_in(self) -> bool:
         self.logd("===准备签到===")
-        if not self.is_check_in():
+        if not self.__is_check_in():
             self.logd("现在执行签到")
             result = self.execute_check_in()
             if result:
-                JsonCacheUtils.set_flag_today(self.app_info.name, True)
+                JsonCacheUtils.set_flag_today(self.app_info.name, True, cache_path="check_in")
             self.logd("签到结果", result)
-            if self.app_info.enable_balance:
-                self.logd("去获取余额")
-                balance = self.get_balance()
-                if balance:
-                    JsonCacheUtils.set_flag_today(self.app_info.name + ",b", balance, cache_path="balance")
-                self.logd("余额", balance)
             self.logd("===签到执行完毕===", "enter")
             return result
         return False
 
-    def is_check_in(self) -> bool:
-        return JsonCacheUtils.get_flag_today(self.app_info.name, False)
+    def __is_check_in(self) -> bool:
+        return JsonCacheUtils.get_flag_today(self.app_info.name, cache_path="check_in", default=False)
 
     @abstractmethod
     def execute_check_in(self) -> bool:
+        ...
+
+    def __get_balance(self):
+        if not self.__is_get_balance():
+            self.logd("去获取余额")
+            balance = self.execute_get_balance()
+            if balance:
+                JsonCacheUtils.set_flag_today(self.app_info.name, balance, cache_path="balance")
+            self.logd("余额", balance)
+
+    def __is_get_balance(self) -> bool:
+        balance = JsonCacheUtils.get_flag_today(self.app_info.name, cache_path="balance", default="")
+        if balance.strip() == "":
+            return False
+        return True
+
+    @abstractmethod
+    def execute_get_balance(self) -> str | None:
         ...
 
     def main_task_loop(self):

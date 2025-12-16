@@ -1,5 +1,6 @@
 import asyncio
 import random
+from pathlib import Path
 from time import sleep
 
 from poco.proxy import UIObjectProxy
@@ -12,6 +13,8 @@ from device.DeviceManager import DeviceManager
 from device.operation.UIOperation import UIOperation, Operation
 from device.uiview.FindUIInfo import FindUITargetInfo
 
+parent_dir = Path(__file__).parent
+
 
 class DouYinApp(AppRunCommon):
     app_info = AppInfoDouYin
@@ -22,6 +25,7 @@ class DouYinApp(AppRunCommon):
         self.device = device
         super().__init__(self.app_info, device)
         self.resource_dir = "douyin/"
+        self.balance_snapshot = str(parent_dir / "snapshot" / "balance" / (self.get_today_file_name() + ".jpg"))
         self.close_icon = self.resource_dir + "bg_white_close_icon.png"
 
     def handle_launch_dialog(self):
@@ -46,30 +50,26 @@ class DouYinApp(AppRunCommon):
     def execute_check_in(self) -> bool:
         result = False
         check_in_flag = FindUITargetInfo(ConstViewType.Group, size=(0.675, 0.0097), position=(0.5, 0.4307),
-                                         parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3}, desc="进度条")
+                                         parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3},
+                                         desc="进度条")
         if self.device.click_by_flag(check_in_flag):
             result = True
             self.device.sleep_operation_random()
             self.device.click_by_flag(self.resource_dir + "check_in_success_close_icon.png")
-        # standby_check_in = UIOperation(True, Operation.Click, "立即签到", exist_timeout=2)
-        # if not result and self.device.ui_operation_sequence(standby_check_in):
-        #     result = True
-        # if self.device.click_by_text("去看视频"):
-        #     self.reward_ad_video_item()
-        # self.device.click_by_image(self.close_icon, timeout=2)
         return result
 
-    def get_balance(self) -> str | None:
-        go_coin = UIOperation(True, Operation.Click, "我的金币")
-        go_success = UIOperation(True, Operation.Exist, "我的收益")
-        balance = None
-        if self.device.ui_operation_sequence(go_coin, go_success):
-            ui = self.device.exist_by_find_info(
-                FindUITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898)))
-            if ui is not None and ui.get_text():
-                balance = ui.get_text()
-            self.device.press_back()
-        return balance
+    def execute_get_balance(self) -> str | None:
+        balance_info = FindUITargetInfo(ConstViewType.Group, size=(0.915, 0.1389), position=(0.5, 0.1794),
+                                        parent_name=ConstViewType.Group,
+                                        z_orders={'global': 0, 'local': 1}, )
+        balance_result = None
+        balance_ui = self.device.exist_by_flag(balance_info)
+        if balance_ui is not None:
+            result = self.device.screenshot(save_path=self.balance_snapshot, ui=balance_ui)
+            if result is not None:
+                balance_result = self.balance_snapshot
+        self.device.sleep_operation_random()
+        return balance_result
 
     def main_task_item(self):
         exist_flag = self.id_prefix + "user_avatar"

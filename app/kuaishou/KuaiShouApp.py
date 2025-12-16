@@ -71,7 +71,7 @@ class KuaiShouApp(AppRunCommon):
         self.device.click_by_image(self.close_icon, timeout=2)
         return result
 
-    def get_balance(self) -> str | None:
+    def execute_get_balance(self) -> str | None:
         go_coin = UIOperation(True, Operation.Click, "我的金币")
         go_success = UIOperation(True, Operation.Exist, "我的收益")
         balance = None
