@@ -395,7 +395,7 @@ class DeviceBase(DeviceRandomConfig):
         print(Log.filter, formatted_time, *content)
 
     def screenshot(self, save_path: str = None, ui: UIObjectProxy = None, 
-                   quality: int = 10, scale: float = 0.4) -> Image.Image | None:
+                   quality: int = 5, scale: float = 0.2) -> Image.Image | None:
         """
         截图：传 ui 则按元素区域裁剪，否则全屏
         Args:
