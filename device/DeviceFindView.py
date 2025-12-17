@@ -36,7 +36,7 @@ class DeviceFindView(DeviceBase):
     def find_child_form_parent_by_id(self, parent_id: str, child_index: int, timeout=10) -> UIObjectProxy | None:
         try:
             parent = self.poco(resourceId=parent_id).wait(timeout=timeout)
-            if parent.exists():
+            if parent is not None and parent.exists():
                 children = parent.children()
                 if len(children) > child_index:
                     return children[child_index]
@@ -47,10 +47,12 @@ class DeviceFindView(DeviceBase):
     def find_view_from_offspring_by_id(self, parent_id: str, child_id: str, timeout=10) -> UIObjectProxy | None:
         try:
             parent = self.poco(resourceId=parent_id).wait(timeout=timeout)
+            if parent is None:
+                return None
             parent.get_bounds()
             if parent.exists():
                 offspring = parent.offspring(resourceId=child_id)
-                if offspring.exists():
+                if offspring is not None and offspring.exists():
                     return offspring
         except Exception as e:
             print(f"{e}")
@@ -70,6 +72,8 @@ class DeviceFindView(DeviceBase):
 
     def exist_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> UIObjectProxy | None:
         types = self.poco(type=ui_info.ui_name).wait(timeout=timeout)
+        if types is None:
+            return None
         for type in types:
             size_match = True
             position_match = True
@@ -114,6 +118,8 @@ class DeviceFindView(DeviceBase):
 
     def find_all_contain_text(self, view_type: str, text: str, timeout=3) -> UIObjectProxy | None:
         types = self.poco(type=view_type).wait(timeout=timeout)
+        if types is None:
+            return None
         for ui in types:
             ui_text = ui.get_text()
             if ui_text and text in ui_text:
@@ -123,6 +129,8 @@ class DeviceFindView(DeviceBase):
 
     def find_all_contain_name(self, view_type: str, text: str, timeout=3) -> UIObjectProxy | None:
         types = self.poco(type=view_type).wait(timeout=timeout)
+        if types is None:
+            return None
         for ui in types:
             ui_text = ui.get_name()
             if ui_text and text in ui_text:
@@ -133,17 +141,17 @@ class DeviceFindView(DeviceBase):
     def find_list_by_flag(self, flag: str, timeout=3) -> UIObjectProxy | None:
         if self.flag_is_id(flag):
             types = self.poco(name=flag).wait(timeout=timeout)
-            if len(types) > 0:
+            if types is not None and len(types) > 0:
                 index = random.randint(0, len(types) - 1)
                 return types[index]
         elif self.flag_is_desc(flag):
             types = self.poco(desc=flag.replace(ConstFlag.Desc)).wait(timeout=timeout)
-            if len(types) > 0:
+            if types is not None and len(types) > 0:
                 index = random.randint(0, len(types) - 1)
                 return types[index]
         else:
             types = self.poco(text=flag).wait(timeout=timeout)
-            if len(types) > 0:
+            if types is not None and len(types) > 0:
                 index = random.randint(0, len(types) - 1)
                 return types[index]
         return None
