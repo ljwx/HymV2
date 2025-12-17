@@ -72,7 +72,9 @@ class AppRunCommon(AppRunBase):
         for ad in flag.task_page_ad_flag:
             self.device.click_by_text(ad, 1)
         if self.device.exist_by_flag(flag.task_page_flag, 2):
+            self.logd("去任务页成功")
             return True
+        self.logd("去任务页失败")
         return False
 
     @abstractmethod

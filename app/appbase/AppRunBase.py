@@ -74,16 +74,12 @@ class AppRunBase(ABC):
         if not first_check_in:
             check_in()
         self.__get_balance()
-        self.logd("===获取时间段奖励===")
         self.get_duration_reward()
-        self.logd("===时间段奖励结束===", "enter")
         if random.random() < self.execute_ad_reward_probably and self.go_task_page():
             times = random.randint(1, 3)
             self.logd("执行视频广告任务", str(times), "次")
             for i in range(times):
-                self.logd("===开始视频广告item===")
                 self.start_video_task()
-                self.logd("===结束视频广告item===", "enter")
 
     @abstractmethod
     def handle_launch_dialog(self):
