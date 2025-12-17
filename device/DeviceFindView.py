@@ -79,6 +79,7 @@ class DeviceFindView(DeviceBase):
             position_match = True
             parent_match = True
             z_orders_match = True
+            content_match = True
             if ui_info.size is not None:
                 if not self.__size_match(type.get_size(), ui_info.size):
                     size_match = False
@@ -97,7 +98,13 @@ class DeviceFindView(DeviceBase):
                     _local = zord.get("local") == ui_info.z_orders.get("local")
                     if _global and _local:
                         z_orders_match = True
-            if size_match and position_match and parent_match and z_orders_match:
+            if ui_info.contains_text is not None:
+                text = type.get_text()
+                if text is not None and text.strip().__contains__(ui_info.contains_text):
+                    content_match = True
+                else:
+                    content_match = False
+            if size_match and position_match and parent_match and z_orders_match and content_match:
                 self.logd("通过ui_info找到了ui", str(ui_info.desc) if ui_info.desc is not None else "")
                 return type
             # if size_match and position_match:

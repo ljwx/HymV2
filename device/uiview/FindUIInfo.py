@@ -2,10 +2,13 @@ class FindUITargetInfo:
     def __init__(self, ui_name: str, size: tuple[float, float] | None = None,
                  position: tuple[float, float] | None = None,
                  z_orders: dict[str, int] = None,
-                 parent_name: str = None, desc: str = None, ):
+                 parent_name: str = None,
+                 contains_text: str = None,
+                 desc: str = None, ):
         self.ui_name = ui_name
         self.size = size
         self.position = position
         self.z_orders = z_orders
         self.parent_name = parent_name
+        self.contains_text = contains_text
         self.desc = desc

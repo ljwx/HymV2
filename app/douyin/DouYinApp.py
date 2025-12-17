@@ -137,7 +137,6 @@ class DouYinApp(AppRunCommon):
                     execute()
 
     def reward_ad_video_item(self) -> bool:
-        self.device.click_by_flag(self.resource_dir + "duration_reward_close_icon.png", 1)
 
         def ad_page_back():
             self.device.click_by_flag(self.id_prefix + "iv_back", 1)
@@ -146,12 +145,11 @@ class DouYinApp(AppRunCommon):
             if self.device.find_all_contain_name(ConstViewType.Group, "秒后可领奖励", 4):
                 self.device.sleep_operation_random(random.randint(33, 39))
                 ad_page_back()
-                close_flag = self.device.find_all_contain_name(ConstViewType.Group, "领取成功，关闭，按钮", 4)
-                if close_flag is not None:
+                if self.device.click_by_flag(ConstFlag.Desc + "领取成功，关闭，按钮", 4):
                     ad_page_back()
-                    close_flag.click(focus=self.device.get_click_position_offset())
-                    ad_page_back()
-                    close_flag.click(focus=self.device.get_click_position_offset())
+                    self.device.click_by_flag(
+                        FindUITargetInfo(ConstViewType.Image, size=(0.065, 0.0292), position=(0.8033, 0.3741),
+                                         parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3}), 1)
                 ad_page_back()
             return False
 
@@ -163,7 +161,7 @@ class DouYinApp(AppRunCommon):
         for i in range(2):
             first_video()
             second_video()
-            self.device.click_by_flag(self.id_prefix + "iv_back", 1)
+            ad_page_back()
         close_ad_icon = FindUITargetInfo(ConstViewType.Image, size=(0.065, 0.0292), position=(0.8033, 0.3741),
                                          parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3})
         self.device.click_by_flag(close_ad_icon, 1)
@@ -173,17 +171,27 @@ class DouYinApp(AppRunCommon):
     def get_duration_reward(self) -> bool:
         if not self.go_task_page():
             return False
-        close_icon = self.resource_dir + "duration_reward_close_icon.png"
+        close_icon = FindUITargetInfo(ConstViewType.Image, size=(0.075, 0.0333), position=(0.8041, 0.3164),
+                                      parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 5})
         go_ad_enter = FindUITargetInfo(ConstViewType.Group, size=(0.5866, 0.0625), position=(0.5, 0.5535),
                                        z_orders={'global': 0, 'local': 3}, parent_name=ConstViewType.Group)
-        if self.device.click_by_flag(ConstFlag.Desc + "开宝箱得金币", 2):
-            self.device.click_by_flag(close_icon, 4)
+
+        def reward_ad_video() -> bool:
             if self.device.click_by_find_info(go_ad_enter, 4):
                 self.reward_ad_video_item()
+                return True
+            return False
+
+        if self.device.click_by_flag(ConstFlag.Desc + "开宝箱得金币", 2):  # 方式一
+            reward_ad_video()
             return True
-        if self.device.click_by_flag(self.resource_dir + "duration_reward_icon.png", 1):
-            self.device.click_by_flag(close_icon, 4)
+
+        reward_icon = FindUITargetInfo(ConstViewType.Texture, size=(0.2641, 0.0711), position=(0.8475, 0.8962),
+                                       z_orders={'global': 0, 'local': 3}, parent_name=ConstViewType.Group)
+        if self.device.click_by_flag(reward_icon, 1):  # 方式二
+            reward_ad_video()
             return True
+        self.device.click_by_flag(close_icon, 1)
         return False
 
     def every_time_clear(self):

@@ -43,7 +43,10 @@ class KuaiShouApp(AppRunFather):
         return MainHomePageData(self.id_prefix + "bottom_bar_container", "首页", None)
 
     def get_task_page_flag(self) -> MainTaskPageData:
-        return MainTaskPageData(True, "去赚钱", "任务中心", [self.close_icon, self.close_icon])
+        ["瓜分百亿金币", ""]
+        close_icon = FindUITargetInfo(ConstViewType.Image, (0.0708, 0.0314), (0.92, 0.1921),
+                                      parent_name=ConstViewType.View)
+        return MainTaskPageData(True, "去赚钱", "任务中心", [close_icon, self.close_icon])
 
     def execute_check_in(self) -> bool:
         exist_click = UIOperation(True, Operation.Exist_Click, self.check_in_icon, "今日签到可领")
@@ -182,11 +185,12 @@ class KuaiShouApp(AppRunFather):
 
     def get_duration_reward(self) -> bool:
         super().get_duration_reward()
-        reward_lite = self.device.find_all_contain_text(ConstViewType.Text, "金币立即领取", timeout=3)
-        if reward_lite is not None:
-            reward_lite.click(focus=self.device.get_click_position_offset())
+        reward_lite = FindUITargetInfo(ConstViewType.Text, contains_text="金币立即领取")
+        close_icon = FindUITargetInfo(ConstViewType.Text, size=(.07833, 0.0367), position=(0.9275, 0.2250),
+                                      parent_name=ConstViewType.View, z_orders={'global': 0, 'local': 0})
+        if self.device.click_by_flag(reward_lite):
             if self.device.exist_by_flag("任务完成奖励"):
-                self.device.click_by_flag(self.close_icon, timeout=2)
+                self.device.click_by_flag(close_icon, timeout=2)
         return False
 
     def other_reward_task1(self) -> bool:

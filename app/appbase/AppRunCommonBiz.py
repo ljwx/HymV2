@@ -80,7 +80,7 @@ class AppRunCommonBiz(AppRunCommon):
     def get_reward_ad_video_item_flags(self) -> RewardVideoAdItemData:
         ...
 
-    def get_duration_reward(self):
+    def get_duration_reward(self) -> bool:
         flags = self.get_duration_reward_flags()
 
         def execute() -> bool:
