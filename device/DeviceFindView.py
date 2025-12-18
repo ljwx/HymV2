@@ -3,12 +3,11 @@ import random
 from poco.proxy import UIObjectProxy
 
 from constant.Const import ConstViewType, ConstFlag
-from device.DeviceBase import DeviceBase
+from device.DeviceCommon import DeviceCommon
 from device.DeviceInfo import DeviceInfo
-from device.uiview.FindUIInfo import FindUITargetInfo
 
 
-class DeviceFindView(DeviceBase):
+class DeviceFindView(DeviceCommon):
     def __init__(self, device_info: DeviceInfo):
         super().__init__(device_info)
 

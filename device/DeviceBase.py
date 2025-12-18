@@ -152,7 +152,7 @@ class DeviceBase(DeviceRandomConfig):
         return self.get_top_activity()[0] == package_name
 
     @classmethod
-    def _find_project_root(cls) -> Path:
+    def __find_project_root(cls) -> Path:
         if cls._project_root is not None:
             return cls._project_root
 
@@ -168,8 +168,8 @@ class DeviceBase(DeviceRandomConfig):
         cls._project_root = fallback_root
         return fallback_root
 
-    def get_resource_path(self, relative_path: str) -> str:
-        project_root = self._find_project_root()
+    def __get_resource_path(self, relative_path: str) -> str:
+        project_root = self.__find_project_root()
         resource_dir = project_root / "resource"
         resource_path = resource_dir / relative_path
         return str(resource_path.resolve())
@@ -209,7 +209,7 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists(flag + ",查找异常：" + e)
             return None
 
-    def _exist_by_id(self, resource_id: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
+    def __exist_by_id(self, resource_id: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
             element = self.poco(resourceId=resource_id).wait(timeout=timeout)
             if self.debug_multiple_elements and len(element) > 1:
@@ -220,7 +220,7 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists(f"{COLOR_RED}id:{resource_id}，异常：{e}{COLOR_RESET}")
             return None
 
-    def _exist_by_text(self, text: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
+    def __exist_by_text(self, text: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         if not isinstance(text, str):
             Log.d_view_exists(f"{COLOR_RED}exist_by_text 收到非字符串参数: {type(text)}{COLOR_RESET}")
             return None
@@ -234,7 +234,7 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists(f"{COLOR_RED}text:{text}，异常：{e}{COLOR_RESET}")
             return None
 
-    def _exist_by_desc(self, desc: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
+    def __exist_by_desc(self, desc: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
             element = self.poco(desc=desc.replace(ConstFlag.Desc, "")).wait(timeout=timeout)
             if self.debug_multiple_elements and len(element) > 1:
@@ -245,10 +245,10 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists(f"{COLOR_RED}desc:{desc}，异常：{e}{COLOR_RESET}")
             return None
 
-    def _exist_by_image(self, image_path: str, threshold=0.75, timeout: float = default_wait_view_timeout) -> \
+    def __exist_by_image(self, image_path: str, threshold=0.75, timeout: float = default_wait_view_timeout) -> \
             tuple[float, float] | None:
         try:
-            abs_path = str(Path(self.get_resource_path(image_path)).resolve())
+            abs_path = str(Path(self.__get_resource_path(image_path)).resolve())
             if not os.path.exists(abs_path):
                 Log.d_view_exists(f"图片文件不存在: {abs_path}")
                 return None
@@ -280,7 +280,7 @@ class DeviceBase(DeviceRandomConfig):
         y = abs(screen_position[1] - target_position[1]) < position_diff
         return x and y
 
-    def _exist_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> UIObjectProxy | None:
+    def __exist_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> UIObjectProxy | None:
         types = self.poco(type=ui_info.ui_name).wait(timeout=timeout)
         if types is None:
             return None
@@ -324,23 +324,23 @@ class DeviceBase(DeviceRandomConfig):
     def exist_by_flag(self, flag: str | FindUITargetInfo,
                       timeout: float = default_wait_view_timeout) -> UIObjectProxy | None | tuple[float, float]:
         if self.flag_is_find_info(flag):
-            ui = self._exist_by_find_info(flag, timeout=timeout)
+            ui = self.__exist_by_find_info(flag, timeout=timeout)
             if ui is not None:
                 return ui
         elif self.flag_is_id(flag):
-            ui = self._exist_by_id(flag, timeout=timeout)
+            ui = self.__exist_by_id(flag, timeout=timeout)
             if ui is not None:
                 return ui
         elif self.flag_is_image(flag):
-            ui = self._exist_by_image(flag, timeout=timeout)
+            ui = self.__exist_by_image(flag, timeout=timeout)
             if ui is not None:
                 return ui
         elif self.flag_is_desc(flag):
-            ui = self._exist_by_desc(flag, timeout=timeout)
+            ui = self.__exist_by_desc(flag, timeout=timeout)
             if ui is not None:
                 return ui
         elif isinstance(flag, str):
-            ui = self._exist_by_text(flag, timeout=timeout)
+            ui = self.__exist_by_text(flag, timeout=timeout)
             if ui is not None:
                 return ui
         return None
@@ -350,27 +350,27 @@ class DeviceBase(DeviceRandomConfig):
             result = element.click(focus=self.get_click_position_offset())
             if double_check:
                 element.click(focus=self.get_click_position_offset())
-            Log.d_view_click(flag + ",click:" + str(result))
+            Log.d_view_click(flag + ",点击成功:" + (result is None))
             if result is None or result:
                 return True
         return False
 
-    def _click_by_id(self, resource_id: str, timeout=default_wait_view_timeout,
-                     double_check: bool = False) -> bool:
-        element = self._exist_by_id(resource_id, timeout=timeout)
+    def __click_by_id(self, resource_id: str, timeout=default_wait_view_timeout,
+                      double_check: bool = False) -> bool:
+        element = self.__exist_by_id(resource_id, timeout=timeout)
         return self.__execute_click(resource_id, element, double_check=double_check)
 
-    def _click_by_text(self, text: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
-        element = self._exist_by_text(text, timeout=timeout)
+    def __click_by_text(self, text: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
+        element = self.__exist_by_text(text, timeout=timeout)
         return self.__execute_click(text, element, double_check=double_check)
 
-    def _click_by_desc(self, desc: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
-        element = self._exist_by_desc(desc, timeout=timeout)
+    def __click_by_desc(self, desc: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
+        element = self.__exist_by_desc(desc, timeout=timeout)
         return self.__execute_click(desc, element, double_check=double_check)
 
-    def _click_by_image(self, image_path: str, threshold: float = 0.8,
-                        timeout: float = default_wait_view_timeout) -> bool:
-        position = self._exist_by_image(image_path, threshold=threshold, timeout=timeout)
+    def __click_by_image(self, image_path: str, threshold: float = 0.8,
+                         timeout: float = default_wait_view_timeout) -> bool:
+        position = self.__exist_by_image(image_path, threshold=threshold, timeout=timeout)
         if position is not None:
             sleep(self.get_click_wait_time())
             self.dev.touch(pos=self.get_touch_position_offset(position), duration=self.get_touch_duration())
@@ -379,8 +379,8 @@ class DeviceBase(DeviceRandomConfig):
         # touch(template, timeout=timeout)
         return False
 
-    def _click_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> bool:
-        ui = self._exist_by_find_info(ui_info, timeout=timeout)
+    def __click_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> bool:
+        ui = self.__exist_by_find_info(ui_info, timeout=timeout)
         if ui is not None:
             ui.click(focus=self.get_click_position_offset())
             return True
@@ -389,27 +389,27 @@ class DeviceBase(DeviceRandomConfig):
 
     def click_by_flag(self, flag: str | FindUITargetInfo, timeout=default_wait_view_timeout) -> bool:
         if self.flag_is_find_info(flag):
-            return self._click_by_find_info(flag, timeout=timeout)
+            return self.__click_by_find_info(flag, timeout=timeout)
         elif self.flag_is_id(flag):
-            return self._click_by_id(flag, timeout=timeout)
+            return self.__click_by_id(flag, timeout=timeout)
         elif self.flag_is_image(flag):
-            return self._click_by_image(flag, timeout=timeout)
+            return self.__click_by_image(flag, timeout=timeout)
         elif self.flag_is_desc(flag):
-            return self._click_by_desc(flag, timeout=timeout)
+            return self.__click_by_desc(flag, timeout=timeout)
         elif self.flag_is_position(flag):
             pos_str = flag.replace(ConstFlag.Position, "")
             pos = tuple(ast.literal_eval(pos_str))
-            print("点击位置", pos)
+            self.logd("点击位置", pos)
             self.dev.touch(pos=self.get_touch_position_offset(pos), duration=self.get_touch_duration())
             return True
         elif isinstance(flag, str):
-            return self._click_by_text(flag, timeout=timeout)
+            return self.__click_by_text(flag, timeout=timeout)
         return False
 
     def is_text_selected(self, text: str) -> bool:
         if not isinstance(text, str):
             return False
-        ui = self._exist_by_text(text)
+        ui = self.__exist_by_text(text)
         if ui is not None:
             selected = ui.attr("selected")
             self.logd(text, "是否选中", selected)
@@ -488,7 +488,7 @@ class DeviceBase(DeviceRandomConfig):
                 except Exception as e:
                     self.logd(f"获取元素边界失败: {e}，返回全屏截图")
             if save_path:
-                full = self._find_project_root() / save_path
+                full = self.__find_project_root() / save_path
                 full.parent.mkdir(parents=True, exist_ok=True)
                 # JPEG 格式支持 quality 压缩，PNG 是无损格式不支持
                 if save_path.lower().endswith(('.jpg', '.jpeg')):
