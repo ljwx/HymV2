@@ -57,20 +57,6 @@ class KuaiShouApp(AppRunFather):
                            success_flag="明日签到可领", go_ad_video_flag="去看视频", is_back_task=False,
                            close_flag=self.task_page_close_icon)
 
-    # def execute_check_in(self) -> bool:
-    #     exist_click = UIOperation(True, Operation.Exist_Click, self.check_in_icon, "今日签到可领")
-    #     check_in_result = UIOperation(True, Operation.Exist, "明日签到可领", )
-    #     result = False
-    #     if self.device.ui_operation_sequence(exist_click, check_in_result):
-    #         result = True
-    #     standby_check_in = UIOperation(True, Operation.Click, "立即签到", exist_timeout=2)
-    #     if not result and self.device.ui_operation_sequence(standby_check_in):
-    #         result = True
-    #     if self.device.click_by_flag("去看视频"):
-    #         self.reward_ad_video_item()
-    #     self.device.click_by_flag(self.task_page_close_icon, timeout=2)
-    #     return result
-
     def get_execute_get_balance_flags(self) -> GetBalanceData:
         another_page = GoAnotherPageData(need_enter_another_page=True,
                                          enter_another_page_flag="我的金币",
@@ -78,18 +64,6 @@ class KuaiShouApp(AppRunFather):
         balance_flag = FindUITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898))
         return GetBalanceData(is_go_task_page=True, enter_another_page=another_page,
                               only_snapshot=False, snapshot_path=None, balance_flag=balance_flag)
-
-    # def execute_get_balance(self) -> str | None:
-    #     go_coin = UIOperation(True, Operation.Click, "我的金币")
-    #     go_success = UIOperation(True, Operation.Exist, "我的收益")
-    #     balance = None
-    #     if self.device.ui_operation_sequence(go_coin, go_success):
-    #         ui = self.device.exist_by_flag(
-    #             FindUITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898)))
-    #         if ui is not None and ui.get_text():
-    #             balance = ui.get_text()
-    #         self.device.press_back()
-    #     return balance
 
     def main_task_item(self):
         shopping_ad_video = self.id_prefix + "ad_download_progress"
@@ -133,9 +107,9 @@ class KuaiShouApp(AppRunFather):
         close_live = "com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder"
         return RewardVideoAdItemData(start_success_flag=[self.ad_id_prefix + "video_countdown", live_flag],
                                      wait_time_range=35,
-                                     continue_flag=[], next_ad_flag=["领取奖励"],
+                                     continue_flag=[close_ad_flag], next_ad_flag_sequence=["领取奖励"],
                                      close_flag=[close_ad_flag, close_view],
-                                     final_close_flag=[close_ad_flag, close_view, close_live])
+                                     final_close_flag=[close_ad_flag, close_view, close_live, close_view])
 
     def get_duration_reward_flags(self) -> DurationRewardData:
         reward_flag = FindUITargetInfo(ConstViewType.View, size=(0.2, 0.0827), position=(0.8691, 0.8651),

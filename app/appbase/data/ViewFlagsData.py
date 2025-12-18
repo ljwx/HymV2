@@ -48,7 +48,7 @@ class CheckInData:
     success_flag: str | FindUITargetInfo
     go_ad_video_flag: str | None | FindUITargetInfo
     is_back_task: bool
-    close_flag: str | FindUITargetInfo
+    close_flag: str | FindUITargetInfo | None
 
 
 @dataclasses.dataclass
@@ -72,7 +72,7 @@ class RewardVideoAdItemData:
     start_success_flag: list[str | FindUITargetInfo]
     wait_time_range: float
     continue_flag: list[str | FindUITargetInfo] | None
-    next_ad_flag: list[str | FindUITargetInfo] | None
+    next_ad_flag_sequence: list[str | FindUITargetInfo] | None
     close_flag: list[str | FindUITargetInfo]
     final_close_flag: list[str | FindUITargetInfo] | None
 

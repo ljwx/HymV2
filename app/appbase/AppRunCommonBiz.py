@@ -52,7 +52,8 @@ class AppRunCommonBiz(AppRunCommon):
                 self.reward_ad_video_item()
         if flags.is_back_task:
             self.go_task_page()
-        self.device.click_by_flag(flags.close_flag, 2)
+        if check_in_result and flags.close_flag is not None:
+            self.device.click_by_flag(flags.close_flag, 2)
         self.logd("===签到结束===", "enter")
         return check_in_result
 
@@ -64,7 +65,7 @@ class AppRunCommonBiz(AppRunCommon):
         flags = self.get_execute_get_balance_flags()
 
         def go_another_page() -> bool:
-            if flags.enter_another_page.need_enter_another_page:
+            if flags.enter_another_page is not None and flags.enter_another_page.need_enter_another_page:
                 return self.__enter_another_page(flags.enter_another_page)
             return False
 
@@ -100,10 +101,9 @@ class AppRunCommonBiz(AppRunCommon):
 
     def start_video_task(self):
         flags = self.get_start_video_task_flags()
-        video_ad_enter = flags.enter_flag
 
         def enter_success() -> bool:
-            if self.device.click_by_flag(video_ad_enter, 2):
+            if self.device.click_by_flag(flags.enter_flag, 4):
                 self.reward_ad_video_item()
                 return True
             return False
@@ -137,13 +137,15 @@ class AppRunCommonBiz(AppRunCommon):
             for final_flag in flags.final_close_flag:
                 self.device.click_by_flag(final_flag, 1)
 
-        def execute_next_ad() -> bool:
-            for next_ad in flags.next_ad_flag:
-                if self.device.click_by_flag(next_ad, 2):
-                    self.logd("触发下一个广告")
-                    self.reward_ad_video_item()
-                    return True
-            return False
+        def execute_next_ad():
+            if flags.next_ad_flag_sequence is None:
+                return
+            next_result = True
+            for next_ad in flags.next_ad_flag_sequence:
+                if not self.device.click_by_flag(next_ad, 3):
+                    next_result = False
+            if next_result:
+                self.reward_ad_video_item()
 
         self.logd("===单个广告开始===")
         enter_result = False

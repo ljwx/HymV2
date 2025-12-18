@@ -94,7 +94,7 @@ class AppRunBase(ABC):
         ...
 
     def temp_execute(self) -> bool:
-        self.__check_in()
+        self.start_video_task()
 
     def __check_in(self) -> bool:
         self.logd("===准备签到===")

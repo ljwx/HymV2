@@ -18,6 +18,7 @@ from airtest.core.helper import G
 
 from poco.drivers.android.uiautomation import AndroidUiautomationPoco
 from poco.proxy import UIObjectProxy
+from poco.exceptions import PocoNoSuchNodeException
 
 from constant.Const import ConstFlag
 from device.config.DeviceRandomConfig import DeviceRandomConfig
@@ -198,6 +199,9 @@ class DeviceBase(DeviceRandomConfig):
     def flag_is_find_info(self, flag: FindUITargetInfo) -> bool:
         return isinstance(flag, FindUITargetInfo)
 
+    def flag_is_back(self, flag: str) -> bool:
+        return flag.startswith(ConstFlag.Back)
+
     def __execute_exist_by_flag(self, flag: str, element: UIObjectProxy | None) -> UIObjectProxy | None:
         try:
             exist = element.exists()
@@ -281,8 +285,15 @@ class DeviceBase(DeviceRandomConfig):
         return x and y
 
     def __exist_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> UIObjectProxy | None:
-        types = self.poco(type=ui_info.ui_name).wait(timeout=timeout)
-        if types is None:
+        try:
+            types = self.poco(type=ui_info.ui_name).wait(timeout=timeout)
+            if types is None:
+                return None
+        except PocoNoSuchNodeException:
+            Log.d_view_exists(f"找不到类型为 {ui_info.ui_name} 的节点")
+            return None
+        except Exception as e:
+            Log.d_view_exists(f"{COLOR_RED}查找节点异常: {ui_info.ui_name}, 错误: {e}{COLOR_RESET}")
             return None
         for type in types:
             size_match = True
@@ -290,6 +301,7 @@ class DeviceBase(DeviceRandomConfig):
             parent_match = True
             z_orders_match = True
             content_match = True
+            desc_match = True
             if ui_info.size is not None:
                 if not self.__size_match(type.get_size(), ui_info.size):
                     size_match = False
@@ -309,12 +321,24 @@ class DeviceBase(DeviceRandomConfig):
                     if _global and _local:
                         z_orders_match = True
             if ui_info.contains_text is not None:
-                text = type.get_text()
-                if text is not None and text.strip().__contains__(ui_info.contains_text):
-                    content_match = True
-                else:
+                try:
+                    text = type.get_text()
+                    if text is not None and text.strip().__contains__(ui_info.contains_text):
+                        content_match = True
+                    else:
+                        content_match = False
+                except Exception as e:
                     content_match = False
-            if size_match and position_match and parent_match and z_orders_match and content_match:
+            if ui_info.contains_desc is not None:
+                try:
+                    text = type.attr("desc")
+                    if text is not None and text.strip().__contains__(ui_info.contains_desc):
+                        desc_match = True
+                    else:
+                        desc_match = False
+                except Exception as e:
+                    desc_match = False
+            if size_match and position_match and parent_match and z_orders_match and content_match and desc_match:
                 self.logd("通过ui_info找到了ui", str(ui_info.desc) if ui_info.desc is not None else "")
                 return type
             # if size_match and position_match:
@@ -379,17 +403,22 @@ class DeviceBase(DeviceRandomConfig):
         # touch(template, timeout=timeout)
         return False
 
-    def __click_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> bool:
+    def __click_by_find_info(self, ui_info: FindUITargetInfo, timeout=3, offset_y: float | None = None) -> bool:
         ui = self.__exist_by_find_info(ui_info, timeout=timeout)
         if ui is not None:
-            ui.click(focus=self.get_click_position_offset())
+            if offset_y is not None and offset_y > 0:
+                focus = [0.5, 0.5 + offset_y]
+                print(focus)
+                ui.click(focus=self.get_touch_position_offset(focus), )
+            else:
+                ui.click(focus=self.get_click_position_offset())
             return True
         else:
             return False
 
     def click_by_flag(self, flag: str | FindUITargetInfo, timeout=default_wait_view_timeout) -> bool:
         if self.flag_is_find_info(flag):
-            return self.__click_by_find_info(flag, timeout=timeout)
+            return self.__click_by_find_info(flag, timeout=timeout, offset_y=flag.offset_y)
         elif self.flag_is_id(flag):
             return self.__click_by_id(flag, timeout=timeout)
         elif self.flag_is_image(flag):
@@ -402,6 +431,8 @@ class DeviceBase(DeviceRandomConfig):
             self.logd("点击位置", pos)
             self.dev.touch(pos=self.get_touch_position_offset(pos), duration=self.get_touch_duration())
             return True
+        elif self.flag_is_back(flag):
+            self.press_back()
         elif isinstance(flag, str):
             return self.__click_by_text(flag, timeout=timeout)
         return False
@@ -454,7 +485,7 @@ class DeviceBase(DeviceRandomConfig):
         print(Log.filter, formatted_time, *content)
 
     def screenshot(self, save_path: str = None, ui: UIObjectProxy = None,
-                   quality: int = 5, scale: float = 0.2) -> Image.Image | None:
+                   quality: int = 10, scale: float = 0.2) -> Image.Image | None:
         """
         截图：传 ui 则按元素区域裁剪，否则全屏
         Args:

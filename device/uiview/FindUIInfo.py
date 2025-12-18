@@ -4,6 +4,8 @@ class FindUITargetInfo:
                  z_orders: dict[str, int] = None,
                  parent_name: str = None,
                  contains_text: str = None,
+                 contains_desc: str = None,
+                 offset_y: float = None,
                  desc: str = None, ):
         self.ui_name = ui_name
         self.size = size
@@ -11,4 +13,6 @@ class FindUITargetInfo:
         self.z_orders = z_orders
         self.parent_name = parent_name
         self.contains_text = contains_text
+        self.contains_desc = contains_desc
+        self.offset_y = offset_y
         self.desc = desc

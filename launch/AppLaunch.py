@@ -43,5 +43,5 @@ class AppLaunch:
                 traceback.print_exc()
 
     def get_apps(self, device: DeviceManager):
-        return [KuaiShouApp(device=device)]
-        # return [KuaiShouApp(device=device),DouYinApp(device=device)]
+        # return [DouYinApp(device=device)]
+        return [KuaiShouApp(device=device),DouYinApp(device=device)]

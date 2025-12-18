@@ -13,5 +13,5 @@ AppInfoKuaiShou = AppPackageInfo("kuaishou", "com.kuaishou.nebula", "1.0.0",
 AppInfoDouYin = AppPackageInfo("douyin", "com.ss.android.ugc.aweme.lite", "1.0.0",
                                ad_id_prefix="com.ss.android.ugc.aweme.lite:id/")
 
-AppInfoDouYin = AppPackageInfo("qutoutiao", "com.jifen.qukan", "1.0.0",
+AppInfoQuTouTiao = AppPackageInfo("qutoutiao", "com.jifen.qukan", "1.0.0",
                                ad_id_prefix="com.ss.android.ugc.aweme.lite:id/")
