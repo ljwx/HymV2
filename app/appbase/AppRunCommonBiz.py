@@ -1,7 +1,9 @@
+import traceback
 from abc import abstractmethod
 
 from app.appbase.AppRunCommon import AppRunCommon
-from app.appbase.data.ViewFlagsData import RewardVideoAdItemData, StartVideoTaskData, DurationRewardData, CheckInData
+from app.appbase.data.ViewFlagsData import RewardVideoAdItemData, StartVideoTaskData, DurationRewardData, CheckInData, \
+    GoAnotherPageData, GetBalanceData
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 
@@ -9,6 +11,12 @@ from device.DeviceManager import DeviceManager
 class AppRunCommonBiz(AppRunCommon):
     def __init__(self, app_info: AppPackageInfo, device: DeviceManager):
         super().__init__(app_info, device)
+
+    def __enter_another_page(self, data: GoAnotherPageData) -> bool:
+        if self.device.click_by_flag(data.enter_another_page_flag):
+            if self.device.exist_by_flag(data.another_page_success_flag, 8):
+                return True
+        return False
 
     def execute_check_in(self) -> bool:
         flags = self.get_execute_check_in_flags()
@@ -38,13 +46,56 @@ class AppRunCommonBiz(AppRunCommon):
                 check_in_result = execute()
         else:
             check_in_result = execute()
+        if check_in_result and flags.go_ad_video_flag is not None:
+            self.device.sleep_operation_random()
+            if self.device.click_by_flag(flags.go_ad_video_flag, 1):
+                self.reward_ad_video_item()
         if flags.is_back_task:
             self.go_task_page()
         self.device.click_by_flag(flags.close_flag, 2)
         self.logd("===签到结束===", "enter")
         return check_in_result
 
+    @abstractmethod
     def get_execute_check_in_flags(self) -> CheckInData:
+        ...
+
+    def execute_get_balance(self) -> str | None:
+        flags = self.get_execute_get_balance_flags()
+
+        def go_another_page() -> bool:
+            if flags.enter_another_page.need_enter_another_page:
+                return self.__enter_another_page(flags.enter_another_page)
+            return False
+
+        def execute() -> str | None:
+            ui = self.device.exist_by_flag(flags.balance_flag)
+            if ui is None:
+                return None
+            if flags.only_snapshot:
+                self.device.screenshot(flags.snapshot_path, ui=ui)
+                return flags.snapshot_path
+            else:
+                try:
+                    return ui.get_text()
+                except Exception as e:
+                    self.logd("获取text异常", e)
+                    traceback.print_exc()
+            return None
+
+        if flags.is_go_task_page:
+            if not self.go_task_page():
+                return None
+
+        if go_another_page():
+            balance = execute()
+            self.device.press_back()
+        else:
+            balance = execute()
+        return balance
+
+    @abstractmethod
+    def get_execute_get_balance_flags(self) -> GetBalanceData:
         ...
 
     def start_video_task(self):
@@ -74,6 +125,7 @@ class AppRunCommonBiz(AppRunCommon):
                 swipe_up_for_enter()
         self.logd("===结束视频广告===", "enter")
 
+    @abstractmethod
     def get_start_video_task_flags(self) -> StartVideoTaskData:
         ...
 
@@ -123,7 +175,8 @@ class AppRunCommonBiz(AppRunCommon):
         def execute() -> bool:
             result = False
             if self.device.click_by_flag(flags.reward_flag, 3):
-                if self.device.click_by_flag(flags.success_flag, 6):
+                self.device.sleep_operation_random()
+                if self.device.exist_by_flag(flags.success_flag, 8):
                     result = True
                     if flags.go_ad_flag is not None:
                         if self.device.click_by_flag(flags.go_ad_flag, 1):
@@ -140,5 +193,6 @@ class AppRunCommonBiz(AppRunCommon):
             execute()
         self.logd("====时间段奖励结束====", "enter")
 
+    @abstractmethod
     def get_duration_reward_flags(self) -> DurationRewardData:
         ...

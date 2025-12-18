@@ -350,7 +350,7 @@ class DeviceBase(DeviceRandomConfig):
             result = element.click(focus=self.get_click_position_offset())
             if double_check:
                 element.click(focus=self.get_click_position_offset())
-            Log.d_view_click(flag + ",点击成功:" + (result is None))
+            Log.d_view_click(f"{flag},点击成功:{result is None}")
             if result is None or result:
                 return True
         return False

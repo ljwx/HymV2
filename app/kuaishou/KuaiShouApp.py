@@ -4,7 +4,7 @@ from time import sleep
 
 from app.appbase.AppRunFather import AppRunFather
 from app.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData, \
-    RewardVideoAdItemData, StartVideoTaskData, DurationRewardData
+    RewardVideoAdItemData, StartVideoTaskData, DurationRewardData, CheckInData, GetBalanceData, GoAnotherPageData
 from apppackage.AppPackage import AppInfoKuaiShou
 from constant.Const import ConstViewType, ConstFlag
 from device.DeviceManager import DeviceManager
@@ -47,35 +47,49 @@ class KuaiShouApp(AppRunFather):
 
     def get_task_page_flag(self) -> MainTaskPageData:
         ["瓜分百亿金币", ""]
-        return MainTaskPageData(first_go_main_page=True, task_page_success_flag="去赚钱", is_text_and_can_selected=True,
+        return MainTaskPageData(first_go_main_page=True, task_page_enter_flag="去赚钱", is_text_and_can_selected=True,
                                 task_page_ad_flag=[self.task_page_close_icon, self.close_icon],
-                                task_page_enter_flag="任务中心")
+                                task_page_success_flag="任务中心")
 
-    def execute_check_in(self) -> bool:
-        exist_click = UIOperation(True, Operation.Exist_Click, self.check_in_icon, "今日签到可领")
-        check_in_result = UIOperation(True, Operation.Exist, "明日签到可领", )
-        result = False
-        if self.device.ui_operation_sequence(exist_click, check_in_result):
-            result = True
-        standby_check_in = UIOperation(True, Operation.Click, "立即签到", exist_timeout=2)
-        if not result and self.device.ui_operation_sequence(standby_check_in):
-            result = True
-        if self.device.click_by_flag("去看视频"):
-            self.reward_ad_video_item()
-        self.device.click_by_flag(self.task_page_close_icon, timeout=2)
-        return result
+    def get_execute_check_in_flags(self) -> CheckInData:
+        return CheckInData(is_go_task_page=True, first_force_ad_flag=None,
+                           check_in_flag=[self.check_in_icon, "立即签到"],
+                           success_flag="明日签到可领", go_ad_video_flag="去看视频", is_back_task=False,
+                           close_flag=self.task_page_close_icon)
 
-    def execute_get_balance(self) -> str | None:
-        go_coin = UIOperation(True, Operation.Click, "我的金币")
-        go_success = UIOperation(True, Operation.Exist, "我的收益")
-        balance = None
-        if self.device.ui_operation_sequence(go_coin, go_success):
-            ui = self.device.exist_by_flag(
-                FindUITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898)))
-            if ui is not None and ui.get_text():
-                balance = ui.get_text()
-            self.device.press_back()
-        return balance
+    # def execute_check_in(self) -> bool:
+    #     exist_click = UIOperation(True, Operation.Exist_Click, self.check_in_icon, "今日签到可领")
+    #     check_in_result = UIOperation(True, Operation.Exist, "明日签到可领", )
+    #     result = False
+    #     if self.device.ui_operation_sequence(exist_click, check_in_result):
+    #         result = True
+    #     standby_check_in = UIOperation(True, Operation.Click, "立即签到", exist_timeout=2)
+    #     if not result and self.device.ui_operation_sequence(standby_check_in):
+    #         result = True
+    #     if self.device.click_by_flag("去看视频"):
+    #         self.reward_ad_video_item()
+    #     self.device.click_by_flag(self.task_page_close_icon, timeout=2)
+    #     return result
+
+    def get_execute_get_balance_flags(self) -> GetBalanceData:
+        another_page = GoAnotherPageData(need_enter_another_page=True,
+                                         enter_another_page_flag="我的金币",
+                                         another_page_success_flag="我的收益")
+        balance_flag = FindUITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898))
+        return GetBalanceData(is_go_task_page=True, enter_another_page=another_page,
+                              only_snapshot=False, snapshot_path=None, balance_flag=balance_flag)
+
+    # def execute_get_balance(self) -> str | None:
+    #     go_coin = UIOperation(True, Operation.Click, "我的金币")
+    #     go_success = UIOperation(True, Operation.Exist, "我的收益")
+    #     balance = None
+    #     if self.device.ui_operation_sequence(go_coin, go_success):
+    #         ui = self.device.exist_by_flag(
+    #             FindUITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898)))
+    #         if ui is not None and ui.get_text():
+    #             balance = ui.get_text()
+    #         self.device.press_back()
+    #     return balance
 
     def main_task_item(self):
         shopping_ad_video = self.id_prefix + "ad_download_progress"
@@ -115,16 +129,16 @@ class KuaiShouApp(AppRunFather):
     def get_reward_ad_video_item_flags(self) -> RewardVideoAdItemData:
         close_ad_flag = self.ad_id_prefix + "video_countdown_end_icon"
         close_view = ConstFlag.Desc + "close_view"  # 打开app
+        live_flag = "com.kuaishou.nebula.live_audience_plugin:id/live_audience_bottom_mask_view"
         close_live = "com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder"
-        return RewardVideoAdItemData(start_success_flag=[self.ad_id_prefix + "video_countdown",
-                                                         "com.kuaishou.nebula.live_audience_plugin:id/live_audience_bottom_mask_view"],
+        return RewardVideoAdItemData(start_success_flag=[self.ad_id_prefix + "video_countdown", live_flag],
                                      wait_time_range=35,
                                      continue_flag=[], next_ad_flag=["领取奖励"],
                                      close_flag=[close_ad_flag, close_view],
                                      final_close_flag=[close_ad_flag, close_view, close_live])
 
     def get_duration_reward_flags(self) -> DurationRewardData:
-        reward_flag = FindUITargetInfo(ConstViewType.Image, size=(0.1875, 0.0730), position=(0.87, 0.8602),
+        reward_flag = FindUITargetInfo(ConstViewType.View, size=(0.2, 0.0827), position=(0.8691, 0.8651),
                                        parent_name=ConstViewType.View, z_orders={'global': 0, 'local': 0})
         ad_flag = FindUITargetInfo(ConstViewType.Button, size=(0.5058, 0.0666), position=(0.5016, 0.6322),
                                    parent_name=ConstViewType.View, z_orders={'global': 0, 'local': 0})
@@ -136,7 +150,7 @@ class KuaiShouApp(AppRunFather):
     def get_duration_reward(self) -> bool:
         super().get_duration_reward()
         reward_lite = FindUITargetInfo(ConstViewType.Text, contains_text="金币立即领取")
-        close_icon = FindUITargetInfo(ConstViewType.Text, size=(.07833, 0.0367), position=(0.9275, 0.2250),
+        close_icon = FindUITargetInfo(ConstViewType.Text, size=(0.07833, 0.0367), position=(0.9275, 0.2250),
                                       parent_name=ConstViewType.View, z_orders={'global': 0, 'local': 0})
         if self.device.click_by_flag(reward_lite):
             if self.device.exist_by_flag("任务完成奖励"):
