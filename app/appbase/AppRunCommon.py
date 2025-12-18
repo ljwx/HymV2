@@ -67,10 +67,10 @@ class AppRunCommon(AppRunBase):
                 sleep(4)
         else:
             selected = self.device.is_text_selected(flag.task_tab_flag)
-            if selected or self.device.click_by_text(flag.task_tab_flag):
+            if selected or self.device.click_by_flag(flag.task_tab_flag):
                 sleep(4)
         for ad in flag.task_page_ad_flag:
-            self.device.click_by_text(ad, 1)
+            self.device.click_by_flag(ad, 1)
         if self.device.exist_by_flag(flag.task_page_flag, 2):
             self.logd("去任务页成功")
             return True

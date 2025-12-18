@@ -209,7 +209,7 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists(flag + ",查找异常：" + e)
             return None
 
-    def exist_by_id(self, resource_id: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
+    def _exist_by_id(self, resource_id: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
             element = self.poco(resourceId=resource_id).wait(timeout=timeout)
             if self.debug_multiple_elements and len(element) > 1:
@@ -220,7 +220,10 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists(f"{COLOR_RED}id:{resource_id}，异常：{e}{COLOR_RESET}")
             return None
 
-    def exist_by_text(self, text: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
+    def _exist_by_text(self, text: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
+        if not isinstance(text, str):
+            Log.d_view_exists(f"{COLOR_RED}exist_by_text 收到非字符串参数: {type(text)}{COLOR_RESET}")
+            return None
         try:
             element = self.poco(text=text).wait(timeout=timeout)
             if self.debug_multiple_elements and len(element) > 1:
@@ -231,7 +234,7 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists(f"{COLOR_RED}text:{text}，异常：{e}{COLOR_RESET}")
             return None
 
-    def exist_by_desc(self, desc: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
+    def _exist_by_desc(self, desc: str, timeout=default_wait_view_timeout) -> UIObjectProxy | None:
         try:
             element = self.poco(desc=desc.replace(ConstFlag.Desc, "")).wait(timeout=timeout)
             if self.debug_multiple_elements and len(element) > 1:
@@ -242,7 +245,7 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists(f"{COLOR_RED}desc:{desc}，异常：{e}{COLOR_RESET}")
             return None
 
-    def exist_by_image(self, image_path: str, threshold=0.75, timeout: float = default_wait_view_timeout) -> \
+    def _exist_by_image(self, image_path: str, threshold=0.75, timeout: float = default_wait_view_timeout) -> \
             tuple[float, float] | None:
         try:
             abs_path = str(Path(self.get_resource_path(image_path)).resolve())
@@ -265,30 +268,79 @@ class DeviceBase(DeviceRandomConfig):
             Log.d_view_exists(f"{COLOR_RED}图片异常: {image_path}, 错误: {str(e)}, 详情: {error_detail}{COLOR_RESET}")
             return None
 
-    @abstractmethod
-    def exist_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> UIObjectProxy | None:
-        ...
+    def __size_match(self, ui_size: tuple[float, float], info_size: tuple[float, float]) -> bool:
+        size_diff = 0.075
+        width = abs(ui_size[0] - info_size[0]) < size_diff
+        height = abs(ui_size[1] - info_size[1]) < size_diff
+        return width and height
+
+    def __position_match(self, screen_position: tuple[float, float], target_position: tuple[float, float]) -> bool:
+        position_diff = 0.09
+        x = abs(screen_position[0] - target_position[0]) < position_diff
+        y = abs(screen_position[1] - target_position[1]) < position_diff
+        return x and y
+
+    def _exist_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> UIObjectProxy | None:
+        types = self.poco(type=ui_info.ui_name).wait(timeout=timeout)
+        if types is None:
+            return None
+        for type in types:
+            size_match = True
+            position_match = True
+            parent_match = True
+            z_orders_match = True
+            content_match = True
+            if ui_info.size is not None:
+                if not self.__size_match(type.get_size(), ui_info.size):
+                    size_match = False
+            if ui_info.position is not None:
+                if not self.__position_match(type.get_position(), ui_info.position):
+                    position_match = False
+            if ui_info.parent_name is not None:
+                parent = type.parent()
+                if not parent.exists() or not parent.attr("type") == ui_info.parent_name:
+                    parent_match = False
+            if ui_info.z_orders is not None:
+                z_orders_match = False
+                zord = type.attr("zOrders")
+                if isinstance(zord, dict):
+                    _global = zord.get("global") == ui_info.z_orders.get("global")
+                    _local = zord.get("local") == ui_info.z_orders.get("local")
+                    if _global and _local:
+                        z_orders_match = True
+            if ui_info.contains_text is not None:
+                text = type.get_text()
+                if text is not None and text.strip().__contains__(ui_info.contains_text):
+                    content_match = True
+                else:
+                    content_match = False
+            if size_match and position_match and parent_match and z_orders_match and content_match:
+                self.logd("通过ui_info找到了ui", str(ui_info.desc) if ui_info.desc is not None else "")
+                return type
+            # if size_match and position_match:
+            #     print(zord, type.parent().attr("type"))
+        return None
 
     def exist_by_flag(self, flag: str | FindUITargetInfo,
                       timeout: float = default_wait_view_timeout) -> UIObjectProxy | None | tuple[float, float]:
         if self.flag_is_find_info(flag):
-            ui = self.exist_by_find_info(flag, timeout=timeout)
+            ui = self._exist_by_find_info(flag, timeout=timeout)
             if ui is not None:
                 return ui
         elif self.flag_is_id(flag):
-            ui = self.exist_by_id(flag, timeout=timeout)
+            ui = self._exist_by_id(flag, timeout=timeout)
             if ui is not None:
                 return ui
         elif self.flag_is_image(flag):
-            ui = self.exist_by_image(flag, timeout=timeout)
+            ui = self._exist_by_image(flag, timeout=timeout)
             if ui is not None:
                 return ui
         elif self.flag_is_desc(flag):
-            ui = self.exist_by_desc(flag, timeout=timeout)
+            ui = self._exist_by_desc(flag, timeout=timeout)
             if ui is not None:
                 return ui
-        else:
-            ui = self.exist_by_text(flag, timeout=timeout)
+        elif isinstance(flag, str):
+            ui = self._exist_by_text(flag, timeout=timeout)
             if ui is not None:
                 return ui
         return None
@@ -303,22 +355,22 @@ class DeviceBase(DeviceRandomConfig):
                 return True
         return False
 
-    def click_by_id(self, resource_id: str, timeout=default_wait_view_timeout,
-                    double_check: bool = False) -> bool:
-        element = self.exist_by_id(resource_id, timeout=timeout)
+    def _click_by_id(self, resource_id: str, timeout=default_wait_view_timeout,
+                     double_check: bool = False) -> bool:
+        element = self._exist_by_id(resource_id, timeout=timeout)
         return self.__execute_click(resource_id, element, double_check=double_check)
 
-    def click_by_text(self, text: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
-        element = self.exist_by_text(text, timeout=timeout)
+    def _click_by_text(self, text: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
+        element = self._exist_by_text(text, timeout=timeout)
         return self.__execute_click(text, element, double_check=double_check)
 
-    def click_by_desc(self, desc: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
-        element = self.exist_by_desc(desc, timeout=timeout)
+    def _click_by_desc(self, desc: str, timeout=default_wait_view_timeout, double_check: bool = False) -> bool:
+        element = self._exist_by_desc(desc, timeout=timeout)
         return self.__execute_click(desc, element, double_check=double_check)
 
-    def click_by_image(self, image_path: str, threshold: float = 0.8,
-                       timeout: float = default_wait_view_timeout) -> bool:
-        position = self.exist_by_image(image_path, threshold=threshold, timeout=timeout)
+    def _click_by_image(self, image_path: str, threshold: float = 0.8,
+                        timeout: float = default_wait_view_timeout) -> bool:
+        position = self._exist_by_image(image_path, threshold=threshold, timeout=timeout)
         if position is not None:
             sleep(self.get_click_wait_time())
             self.dev.touch(pos=self.get_touch_position_offset(position), duration=self.get_touch_duration())
@@ -327,30 +379,37 @@ class DeviceBase(DeviceRandomConfig):
         # touch(template, timeout=timeout)
         return False
 
-    @abstractmethod
-    def click_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> bool:
-        ...
+    def _click_by_find_info(self, ui_info: FindUITargetInfo, timeout=3) -> bool:
+        ui = self._exist_by_find_info(ui_info, timeout=timeout)
+        if ui is not None:
+            ui.click(focus=self.get_click_position_offset())
+            return True
+        else:
+            return False
 
     def click_by_flag(self, flag: str | FindUITargetInfo, timeout=default_wait_view_timeout) -> bool:
         if self.flag_is_find_info(flag):
-            return self.click_by_find_info(flag, timeout=timeout)
+            return self._click_by_find_info(flag, timeout=timeout)
         elif self.flag_is_id(flag):
-            return self.click_by_id(flag, timeout=timeout)
+            return self._click_by_id(flag, timeout=timeout)
         elif self.flag_is_image(flag):
-            return self.click_by_image(flag, timeout=timeout)
+            return self._click_by_image(flag, timeout=timeout)
         elif self.flag_is_desc(flag):
-            return self.click_by_desc(flag, timeout=timeout)
+            return self._click_by_desc(flag, timeout=timeout)
         elif self.flag_is_position(flag):
             pos_str = flag.replace(ConstFlag.Position, "")
             pos = tuple(ast.literal_eval(pos_str))
             print("点击位置", pos)
             self.dev.touch(pos=self.get_touch_position_offset(pos), duration=self.get_touch_duration())
             return True
-        else:
-            return self.click_by_text(flag, timeout=timeout)
+        elif isinstance(flag, str):
+            return self._click_by_text(flag, timeout=timeout)
+        return False
 
     def is_text_selected(self, text: str) -> bool:
-        ui = self.exist_by_text(text)
+        if not isinstance(text, str):
+            return False
+        ui = self._exist_by_text(text)
         if ui is not None:
             selected = ui.attr("selected")
             self.logd(text, "是否选中", selected)
@@ -394,7 +453,7 @@ class DeviceBase(DeviceRandomConfig):
         formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
         print(Log.filter, formatted_time, *content)
 
-    def screenshot(self, save_path: str = None, ui: UIObjectProxy = None, 
+    def screenshot(self, save_path: str = None, ui: UIObjectProxy = None,
                    quality: int = 5, scale: float = 0.2) -> Image.Image | None:
         """
         截图：传 ui 则按元素区域裁剪，否则全屏
@@ -410,12 +469,12 @@ class DeviceBase(DeviceRandomConfig):
             if raw is None:
                 return None
             img = Image.fromarray(raw)
-            
+
             # 缩放图片（提升处理速度）
             if scale < 1.0:
                 new_size = (int(img.width * scale), int(img.height * scale))
                 img = img.resize(new_size, Image.Resampling.LANCZOS)
-            
+
             if ui is not None:
                 try:
                     top, right, bottom, left = ui.get_bounds()

@@ -177,7 +177,7 @@ class DouYinApp(AppRunCommon):
                                        z_orders={'global': 0, 'local': 3}, parent_name=ConstViewType.Group)
 
         def reward_ad_video() -> bool:
-            if self.device.click_by_find_info(go_ad_enter, 4):
+            if self.device.click_by_flag(go_ad_enter, 4):
                 self.reward_ad_video_item()
                 return True
             return False

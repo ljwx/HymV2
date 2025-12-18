@@ -107,3 +107,4 @@ def normal_random(min_value: float, max_value: float, median: float, std: float 
 def normal_random_int(min_value: int, max_value: int, median: float, std: float = None) -> int:
     generator = NormalDistributionRandom(min_value, max_value, median, std)
     return generator.random_int()
+

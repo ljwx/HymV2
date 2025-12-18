@@ -273,10 +273,10 @@ def get_duration_reward(self) -> bool:
             if ad is not None:
                 ad.click(focus=self.device.get_click_position_offset())
                 self.reward_ad_video_item()
-                self.device.click_by_id("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder",
+                self.device.click_by_flag("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder",
                                         4)  # 直播
         else:
-            self.device.click_by_image(self.close_icon, timeout=2)
+            self.device.click_by_flag(self.close_icon, timeout=2)
         return True
     return False
 

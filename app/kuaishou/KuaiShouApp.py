@@ -28,8 +28,8 @@ class KuaiShouApp(AppRunFather):
 
     def handle_launch_dialog(self):
         super().handle_launch_dialog()
-        if self.device.exist_by_text("邀请2个新用户必得"):
-            close_icon = self.device.exist_by_find_info(
+        if self.device.exist_by_flag("邀请2个新用户必得"):
+            close_icon = self.device.exist_by_flag(
                 FindUITargetInfo(ConstViewType.Image, (0.0758, 0.0340), (0.5, 0.7003)))
             if close_icon is not None:
                 close_icon.click(focus=self.device.get_click_position_offset())
@@ -57,7 +57,7 @@ class KuaiShouApp(AppRunFather):
         standby_check_in = UIOperation(True, Operation.Click, "立即签到", exist_timeout=2)
         if not result and self.device.ui_operation_sequence(standby_check_in):
             result = True
-        if self.device.click_by_text("去看视频"):
+        if self.device.click_by_flag("去看视频"):
             self.reward_ad_video_item()
         self.device.click_by_flag(self.task_page_close_icon, timeout=2)
         return result
@@ -67,7 +67,7 @@ class KuaiShouApp(AppRunFather):
         go_success = UIOperation(True, Operation.Exist, "我的收益")
         balance = None
         if self.device.ui_operation_sequence(go_coin, go_success):
-            ui = self.device.exist_by_find_info(
+            ui = self.device.exist_by_flag(
                 FindUITargetInfo(ConstViewType.Text, size=(0.23, 0.0486), position=(0.1908, 0.1898)))
             if ui is not None and ui.get_text():
                 balance = ui.get_text()
