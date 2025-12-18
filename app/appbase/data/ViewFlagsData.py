@@ -10,17 +10,18 @@ class AppLaunchDialogData:
 
 @dataclasses.dataclass
 class MainHomePageData:
-    main_home_page_flag: str
-    main_home_tab_flag: str
-    main_home_page_intercept_flag: list[str] | None
+    main_home_page_flag: str | FindUITargetInfo
+    main_home_tab_flag: str | FindUITargetInfo
+    main_home_page_intercept_flag: list[str | FindUITargetInfo] | None
 
 
 @dataclasses.dataclass
 class MainTaskPageData:
-    first_go_home: bool
-    task_tab_flag: str | FindUITargetInfo
-    task_page_flag: str | FindUITargetInfo
+    first_go_main_page: bool
+    task_page_enter_flag: str | FindUITargetInfo
+    is_text_and_can_selected: bool
     task_page_ad_flag: list[str | FindUITargetInfo] | None
+    task_page_success_flag: str | FindUITargetInfo
 
 
 @dataclasses.dataclass
@@ -30,6 +31,17 @@ class MainTaskHumanData:
     go_works_flag: str | None | FindUITargetInfo = None
     works_success_flag: str | None | FindUITargetInfo = None
     works_list_flag: str | None | FindUITargetInfo = None
+
+
+@dataclasses.dataclass
+class CheckInData:
+    is_go_task_page: bool
+    first_force_ad_flag: list[str | FindUITargetInfo] | None
+    check_in_flag: list[str | FindUITargetInfo]
+    continue_flag: str | None | FindUITargetInfo
+    success_flag: str | FindUITargetInfo
+    is_back_task: bool
+    close_flag: str | FindUITargetInfo
 
 
 @dataclasses.dataclass

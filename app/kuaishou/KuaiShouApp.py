@@ -39,14 +39,17 @@ class KuaiShouApp(AppRunFather):
         pass
 
     def get_handle_launch_dialog_flag(self) -> AppLaunchDialogData:
-        return AppLaunchDialogData([self.id_prefix + "close_btn"])
+        return AppLaunchDialogData(close_flags=[self.id_prefix + "close_btn"])
 
     def get_main_home_page_flag(self) -> MainHomePageData:
-        return MainHomePageData(self.id_prefix + "bottom_bar_container", "首页", None)
+        return MainHomePageData(main_home_page_flag=self.id_prefix + "bottom_bar_container", main_home_tab_flag="首页",
+                                main_home_page_intercept_flag=None)
 
     def get_task_page_flag(self) -> MainTaskPageData:
         ["瓜分百亿金币", ""]
-        return MainTaskPageData(True, "去赚钱", "任务中心", [self.task_page_close_icon, self.close_icon])
+        return MainTaskPageData(first_go_main_page=True, task_page_success_flag="去赚钱", is_text_and_can_selected=True,
+                                task_page_ad_flag=[self.task_page_close_icon, self.close_icon],
+                                task_page_enter_flag="任务中心")
 
     def execute_check_in(self) -> bool:
         exist_click = UIOperation(True, Operation.Exist_Click, self.check_in_icon, "今日签到可领")
@@ -100,9 +103,11 @@ class KuaiShouApp(AppRunFather):
 
     def get_main_human_flag(self) -> MainTaskHumanData:
         return MainTaskHumanData(
-            self.id_prefix + "like_icon", self.id_prefix + "comment_icon",
-            self.id_prefix + "user_name_text_view", self.id_prefix + "profile_user_kwai_id",
-            self.id_prefix + "recycler_view")
+            star_flag=self.id_prefix + "like_icon",
+            comment_flag=self.id_prefix + "comment_icon",
+            go_works_flag=self.id_prefix + "user_name_text_view",
+            works_success_flag=self.id_prefix + "profile_user_kwai_id",
+            works_list_flag=self.id_prefix + "recycler_view")
 
     def get_start_video_task_flags(self) -> StartVideoTaskData:
         return StartVideoTaskData(is_go_home_page=True, is_go_task_pag=True, enter_flag="看广告得金币")
@@ -117,7 +122,6 @@ class KuaiShouApp(AppRunFather):
                                      continue_flag=[], next_ad_flag=["领取奖励"],
                                      close_flag=[close_ad_flag, close_view],
                                      final_close_flag=[close_ad_flag, close_view, close_live])
-
 
     def get_duration_reward_flags(self) -> DurationRewardData:
         reward_flag = FindUITargetInfo(ConstViewType.Image, size=(0.1875, 0.0730), position=(0.87, 0.8602),

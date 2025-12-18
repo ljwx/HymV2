@@ -33,19 +33,21 @@ class QuTouTiao(AppRunCommon):
         pass
 
     def get_handle_launch_dialog_flag(self) -> AppLaunchDialogData:
-        return AppLaunchDialogData([])
+        return AppLaunchDialogData(close_flags=[])
 
     def get_main_home_page_flag(self) -> MainHomePageData:
         home_tab = FindUITargetInfo(ConstViewType.Frame, size=(0.2, 0.0546), position=(0.1, 0.953),
                                     parent_name=ConstViewType.Linear, z_orders={'global': 0, 'local': 1})
         close = FindUITargetInfo(ConstViewType.Image, size=(0.0975, 0.0438), position=(0.4991, 0.7419),
                                  parent_name=ConstViewType.Relative, z_orders={'global': 0, 'local': 3})
-        return MainHomePageData(home_tab, home_tab, [close])
+        return MainHomePageData(main_home_page_flag=home_tab, main_home_tab_flag=home_tab,
+                                main_home_page_intercept_flag=[close])
 
     def get_task_page_flag(self) -> MainTaskPageData:
         ad_close = FindUITargetInfo(ConstViewType.Image, size=(.04333, 0.0194), position=(0.8391, 0.2610),
                                     parent_name=ConstViewType.Relative, z_orders={'global': 0, 'local': 2})
-        return MainTaskPageData(True, "任务", "换一批", [ad_close])
+        return MainTaskPageData(first_go_main_page=True, task_page_enter_flag="任务", is_text_and_can_selected=False,
+                                task_page_ad_flag=[ad_close], task_page_success_flag="换一批")
 
     def execute_check_in(self) -> bool:
         def loop_video_ad():
@@ -180,35 +182,37 @@ class QuTouTiao(AppRunCommon):
 	  scrollable :  False 
     """
 
-        shopping_ad_video = self.id_prefix + "ad_download_progress"
-        ask_ad_video = "咨询"
-        ad_follow_flag = self.id_prefix + "slide_play_right_link_icon"
-        live_video_text = "点击进入直播间"
-        ads = [shopping_ad_video, ask_ad_video, ad_follow_flag]
-        nors = [self.id_prefix + "create_date_tv", "全屏观看", "作者声明：演绎情节，仅供娱乐",
-                self.id_prefix + "general_entry_single_root_view",
-                self.id_prefix + "pic_text"]
-        lon = ["继续观看完整版", "完整版", "合集"]
-        if not self.device.exist_by_flag(self.id_prefix + "follow_avatar_view", 1.5):
-            self.logd("非正常item，下一个")
-            self.device.swipe_up()
-            self.device.sleep_operation_random()
-        normal, duration = asyncio.run(self.get_main_task_item_duration(ad_flag=ads, normal=nors, long_flag=lon))
-        if normal and random.random() < 0.011:
-            self.device.click_by_flag(self.id_prefix + "follow_button", 1)
-        if self.device.exist_by_flag(self.id_prefix + "follow_avatar_view", 2):
-            wait = UIOperation(True, Operation.Wait, "", exist_waite_time=duration)
-            self.device.ui_operation_sequence(wait)
-        else:
-            self.device.swipe_up()
-        return normal
+    shopping_ad_video = self.id_prefix + "ad_download_progress"
+    ask_ad_video = "咨询"
+    ad_follow_flag = self.id_prefix + "slide_play_right_link_icon"
+    live_video_text = "点击进入直播间"
+    ads = [shopping_ad_video, ask_ad_video, ad_follow_flag]
+    nors = [self.id_prefix + "create_date_tv", "全屏观看", "作者声明：演绎情节，仅供娱乐",
+            self.id_prefix + "general_entry_single_root_view",
+            self.id_prefix + "pic_text"]
+    lon = ["继续观看完整版", "完整版", "合集"]
+    if not self.device.exist_by_flag(self.id_prefix + "follow_avatar_view", 1.5):
+        self.logd("非正常item，下一个")
+        self.device.swipe_up()
+        self.device.sleep_operation_random()
+    normal, duration = asyncio.run(self.get_main_task_item_duration(ad_flag=ads, normal=nors, long_flag=lon))
+    if normal and random.random() < 0.011:
+        self.device.click_by_flag(self.id_prefix + "follow_button", 1)
+    if self.device.exist_by_flag(self.id_prefix + "follow_avatar_view", 2):
+        wait = UIOperation(True, Operation.Wait, "", exist_waite_time=duration)
+        self.device.ui_operation_sequence(wait)
+    else:
+        self.device.swipe_up()
+    return normal
 
 
 def get_main_human_flag(self) -> MainTaskHumanData:
     return MainTaskHumanData(
-        self.id_prefix + "like_icon", self.id_prefix + "comment_icon",
-        self.id_prefix + "user_name_text_view", self.id_prefix + "profile_user_kwai_id",
-        self.id_prefix + "recycler_view")
+        star_flag=self.id_prefix + "like_icon",
+        comment_flag=self.id_prefix + "comment_icon",
+        go_works_flag=self.id_prefix + "user_name_text_view",
+        works_success_flag=self.id_prefix + "profile_user_kwai_id",
+        works_list_flag=self.id_prefix + "recycler_view")
 
 
 def start_video_task(self):
@@ -274,7 +278,7 @@ def get_duration_reward(self) -> bool:
                 ad.click(focus=self.device.get_click_position_offset())
                 self.reward_ad_video_item()
                 self.device.click_by_flag("com.kuaishou.nebula.live_audience_plugin:id/live_close_place_holder",
-                                        4)  # 直播
+                                          4)  # 直播
         else:
             self.device.click_by_flag(self.close_icon, timeout=2)
         return True

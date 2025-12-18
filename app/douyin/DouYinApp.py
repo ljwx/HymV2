@@ -33,10 +33,11 @@ class DouYinApp(AppRunCommon):
         pass
 
     def get_handle_launch_dialog_flag(self) -> AppLaunchDialogData:
-        return AppLaunchDialogData([])
+        return AppLaunchDialogData(close_flags=[])
 
     def get_main_home_page_flag(self) -> MainHomePageData:
-        return MainHomePageData(self.id_prefix + "root_view", "首页", None)
+        return MainHomePageData(main_home_page_flag=self.id_prefix + "root_view", main_home_tab_flag="首页",
+                                main_home_page_intercept_flag=None)
 
     def get_task_page_flag(self) -> MainTaskPageData:
         task_tab_icon = FindUITargetInfo(ConstViewType.Image, size=(0.1025, 0.0449), position=(0.4991, 0.9445),
@@ -45,7 +46,9 @@ class DouYinApp(AppRunCommon):
         task_page_success = FindUITargetInfo(ConstViewType.Texture, size=(0.2641, 0.071), position=(0.8475, 0.8962),
                                              parent_name=ConstViewType.Frame, z_orders={'global': 0, 'local': 1},
                                              desc="宝箱")
-        return MainTaskPageData(True, task_tab_icon, task_page_success, [self.close_icon])
+        return MainTaskPageData(first_go_main_page=True, task_page_enter_flag=task_tab_icon,
+                                is_text_and_can_selected=False, task_page_ad_flag=[self.close_icon],
+                                task_page_success_flag=task_page_success)
 
     def execute_check_in(self) -> bool:
         result = False
@@ -107,9 +110,11 @@ class DouYinApp(AppRunCommon):
         comment = FindUITargetInfo(ConstViewType.Image, size=(0.0975, 0.0438), position=(0.9141, 0.6277),
                                    parent_name=ConstViewType.Frame, z_orders={'global': 0, 'local': 1})
         return MainTaskHumanData(
-            star, comment,
-            self.id_prefix + "user_avatar", "获赞",
-            ConstViewType.Recycler)
+            star_flag=star,
+            comment_flag=comment,
+            go_works_flag=self.id_prefix + "user_avatar",
+            works_success_flag="获赞",
+            works_list_flag=ConstViewType.Recycler)
 
     def start_video_task(self):
 
