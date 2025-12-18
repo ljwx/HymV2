@@ -22,8 +22,12 @@ class JsonCacheUtils:
         path = JsonCacheUtils._get_path(cache_path)
         if not os.path.exists(path):
             return {}
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            # 文件为空或内容无效时返回空字典
+            return {}
 
     @staticmethod
     def _save(data: dict, cache_path: str | None = None) -> None:

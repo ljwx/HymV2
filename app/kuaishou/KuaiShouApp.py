@@ -23,6 +23,8 @@ class KuaiShouApp(AppRunFather):
         self.resource_dir = "kuaishou/"
         self.close_icon = self.resource_dir + "task_tab_page_close_icon.png"
         self.check_in_icon = self.resource_dir + "check_in_icon.png"
+        self.task_page_close_icon = FindUITargetInfo(ConstViewType.Image, (0.0708, 0.0314), (0.92, 0.1921),
+                                                     parent_name=ConstViewType.View)
 
     def handle_launch_dialog(self):
         super().handle_launch_dialog()
@@ -44,9 +46,7 @@ class KuaiShouApp(AppRunFather):
 
     def get_task_page_flag(self) -> MainTaskPageData:
         ["瓜分百亿金币", ""]
-        close_icon = FindUITargetInfo(ConstViewType.Image, (0.0708, 0.0314), (0.92, 0.1921),
-                                      parent_name=ConstViewType.View)
-        return MainTaskPageData(True, "去赚钱", "任务中心", [close_icon, self.close_icon])
+        return MainTaskPageData(True, "去赚钱", "任务中心", [self.task_page_close_icon, self.close_icon])
 
     def execute_check_in(self) -> bool:
         exist_click = UIOperation(True, Operation.Exist_Click, self.check_in_icon, "今日签到可领")
@@ -59,7 +59,7 @@ class KuaiShouApp(AppRunFather):
             result = True
         if self.device.click_by_text("去看视频"):
             self.reward_ad_video_item()
-        self.device.click_by_image(self.close_icon, timeout=2)
+        self.device.click_by_flag(self.task_page_close_icon, timeout=2)
         return result
 
     def execute_get_balance(self) -> str | None:
