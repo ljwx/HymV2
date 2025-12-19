@@ -13,6 +13,9 @@ class AppRunLv1GoHome(AppRunLv0LaunchAd):
 
     def go_main_home_page(self, select_tab: bool = False) -> bool:
         self.logd("去首页", "首页tab是否需要选中", select_tab)
+        if self._skip_home_and_task_page:
+            self.logd("跳过","直接返回true")
+            return True
         flags = self.get_main_home_page_flag()
         main_home_page_flag = flags.main_home_page_flag
         main_home_tab_flag = flags.main_home_tab_flag

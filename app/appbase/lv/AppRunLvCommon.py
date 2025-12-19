@@ -5,6 +5,8 @@ from device.DeviceManager import DeviceManager
 
 
 class AppRunLvCommon(AppRunCommon):
+    _skip_home_and_task_page = False
+
     def __init__(self, app_info: AppPackageInfo, device: DeviceManager):
         super().__init__(app_info, device)
 
@@ -13,3 +15,6 @@ class AppRunLvCommon(AppRunCommon):
             if self.device.exist_by_flag(data.another_page_success_flag, 8):
                 return True
         return False
+
+    def change_skip_home_task_page(self, skip: bool):
+        self._skip_home_and_task_page = skip

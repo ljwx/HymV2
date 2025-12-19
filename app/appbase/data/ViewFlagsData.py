@@ -64,7 +64,7 @@ class GetBalanceData:
 class StartVideoTaskData:
     is_go_home_page: bool
     is_go_task_pag: bool
-    enter_flag: str | FindUITargetInfo = None
+    enter_flag: list[str | FindUITargetInfo]
 
 
 @dataclasses.dataclass

@@ -14,9 +14,10 @@ class AppRunLv6AdVideo(AppRunLv5DurationReward):
         flags = self.get_start_video_task_flags()
 
         def enter_success() -> bool:
-            if self.device.click_by_flag(flags.enter_flag, 4):
-                self.reward_ad_video_item()
-                return True
+            for enter_flag in flags.enter_flag:
+                if self.device.click_by_flag(enter_flag, 4):
+                    self.reward_ad_video_item()
+                    return True
             return False
 
         def swipe_up_for_enter():

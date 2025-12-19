@@ -13,6 +13,9 @@ class AppRunLv2GoTask(AppRunLv1GoHome):
 
     def go_task_page(self) -> bool:
         self.logd("开始去任务页")
+        if self._skip_home_and_task_page:
+            self.logd("跳过","直接返回true")
+            return True
         flag = self.get_task_page_flag()
         if flag.first_go_main_page:
             self.go_main_home_page()

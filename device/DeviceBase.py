@@ -344,6 +344,7 @@ class DeviceBase(DeviceRandomConfig):
                 return type
             # if size_match and position_match:
             #     print(zord, type.parent().attr("type"))
+        self.logd("通过ui_info没找到", str(ui_info.desc) if ui_info.desc is not None else "")
         return None
 
     def exist_by_flag(self, flag: str | FindUITargetInfo,

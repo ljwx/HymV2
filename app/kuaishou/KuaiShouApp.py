@@ -98,7 +98,7 @@ class KuaiShouApp(AppRunFather):
             works_list_flag=self.id_prefix + "recycler_view")
 
     def get_start_video_task_flags(self) -> StartVideoTaskData:
-        return StartVideoTaskData(is_go_home_page=True, is_go_task_pag=True, enter_flag="看广告得金币")
+        return StartVideoTaskData(is_go_home_page=True, is_go_task_pag=True, enter_flag=["看广告得金币"])
 
     def get_reward_ad_video_item_flags(self) -> RewardVideoAdItemData:
         close_ad_flag = self.ad_id_prefix + "video_countdown_end_icon"

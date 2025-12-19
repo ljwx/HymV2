@@ -49,9 +49,12 @@ class DouYinApp(AppRunFather):
                                 task_page_success_flag=task_page_success)
 
     def get_execute_check_in_flags(self) -> CheckInData:
-        check_in_flag = FindUITargetInfo(ConstViewType.Group, size=(0.675, 0.0097), position=(0.5, 0.4307),
-                                         parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3},
-                                         desc="进度条")
+        check_in_exit_flag = FindUITargetInfo(ConstViewType.Group, size=(0.675, 0.0097), position=(0.5, 0.4307),
+                                              parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3},
+                                              desc="进度条")
+        check_in_flag = FindUITargetInfo(ConstViewType.Group, size=(0.6183, 0.0550), position=(0.5, 0.6318),
+                                         parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 1},
+                                         desc="立即签到按钮,签到提醒也是这个")
         standby_check_id_flag = FindUITargetInfo(ConstViewType.Group, size=(0.1975, 0.0404), position=(0.8583, 0.3516),
                                                  parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 4},
                                                  desc="主动签到")
@@ -102,47 +105,29 @@ class DouYinApp(AppRunFather):
             works_list_flag=ConstViewType.Recycler)
 
     def get_start_video_task_flags(self) -> StartVideoTaskData:
-        enter_flag = FindUITargetInfo(ConstViewType.Group, contains_desc="分钟完成一次")
-        return StartVideoTaskData(is_go_home_page=True, is_go_task_pag=True, enter_flag=enter_flag)
-
-    # def start_video_task(self):
-    #
-    #     def find_enter() -> bool | None:
-    #         first = self.device.find_all_contain_name(ConstViewType.Group, "每20分钟完成一次广告任务", 2)
-    #         if first is not None:
-    #             first.click(focus=self.device.get_click_position_offset())
-    #             return True
-    #         second = self.device.find_all_contain_name(ConstViewType.Group, "看广告视频，", 2)
-    #         if second is not None:
-    #             second.click(focus=self.device.get_click_position_offset())
-    #             return True
-    #         return False
-    #
-    #     def execute():
-    #         self.reward_ad_video_item()
-    #         sleep(self.device.get_click_wait_time())
-    #
-    #     if self.go_task_page():
-    #         if find_enter():
-    #             execute()
-    #         else:
-    #             self.device.swipe_up()
-    #             if find_enter():
-    #                 execute()
+        enter_flag = FindUITargetInfo(ConstViewType.Group, contains_desc="分钟完成一次", desc="视频广告入口1")
+        enter_standby = FindUITargetInfo(ConstViewType.Group, contains_desc="看广告视频，本次可得", desc="视频广告入口2")
+        return StartVideoTaskData(is_go_home_page=True, is_go_task_pag=True, enter_flag=[enter_flag, enter_standby])
 
     def get_reward_ad_video_item_flags(self) -> RewardVideoAdItemData:
-        start_success_flag = FindUITargetInfo(ConstViewType.Group, contains_text="秒后可领奖励")
+        start_success_flag = FindUITargetInfo(ConstViewType.Group, contains_desc="秒后可领奖励", desc="读秒倒计时")
+        start_success_flag2 = FindUITargetInfo(ConstViewType.Group, size=(0.1083, 0.0389), position=(0.4766, 0.0730),
+                                               parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 1},
+                                               desc="反馈按钮")
         close_ad_flag = ConstFlag.Desc + "领取成功，关闭，按钮"
         next_ad_flag = FindUITargetInfo(ConstViewType.Group, size=(0.7583333333333333, 0.3928), position=(0.5, 0.4632),
-                                        offset_y=0.2, desc="下一个广告")
-        next_ad_close = FindUITargetInfo(ConstViewType.Image, size=(0.0866, 0.0389), position=(0.9133, 0.0389),
-                                         parent_name=ConstViewType.Relative, z_orders={'global': 0, 'local': 2})
-        return RewardVideoAdItemData(start_success_flag=[start_success_flag],
+                                        offset_y=0.2, desc="再看一个的领取按钮")
+        next_ad_close = FindUITargetInfo(ConstViewType.Image, size=(0.065, 0.0292), position=(0.8033, 0.3741),
+                                         parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3},
+                                         desc="再看一个的关闭按钮")
+        final_close = FindUITargetInfo(ConstViewType.Group, size=(0.7583333333333333, 0.3928), position=(0.5, 0.4632),
+                                       offset_y=0.35, desc="再看一个的坚持退出按钮")
+        return RewardVideoAdItemData(start_success_flag=[start_success_flag, start_success_flag2],
                                      wait_time_range=35,
                                      continue_flag=[self.id_prefix + "iv_back"],
                                      next_ad_flag_sequence=[close_ad_flag, next_ad_flag],
                                      close_flag=[close_ad_flag],
-                                     final_close_flag=[close_ad_flag])
+                                     final_close_flag=[close_ad_flag, final_close])
 
     # def reward_ad_video_item(self) -> bool:
     #
@@ -177,40 +162,17 @@ class DouYinApp(AppRunFather):
     #     return True
 
     def get_duration_reward_flags(self) -> DurationRewardData:
-        reward_flag = FindUITargetInfo(ConstViewType.Texture, size=(0.2641, 0.0711), position=(0.8475, 0.8962),
-                                       z_orders={'global': 0, 'local': 3}, parent_name=ConstViewType.Group)
+        reward_flag_dynamic = FindUITargetInfo(ConstViewType.Texture, size=(0.2641, 0.0711), position=(0.8475, 0.8962),
+                                               z_orders={'global': 0, 'local': 1}, parent_name=ConstViewType.Frame,
+                                               desc="宝箱图标")
         ad_flag = FindUITargetInfo(ConstViewType.Group, size=(0.5866, 0.0625), position=(0.5, 0.5535),
-                                       z_orders={'global': 0, 'local': 3}, parent_name=ConstViewType.Group)
+                                   z_orders={'global': 0, 'local': 3}, parent_name=ConstViewType.Group,
+                                   desc="看广告按钮")
         close_flag = FindUITargetInfo(ConstViewType.Image, size=(0.075, 0.0333), position=(0.8041, 0.3164),
                                       parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 5})
-        return DurationRewardData(is_go_task_page=True, reward_flag=reward_flag, success_flag="开宝箱奖励已到账",
+        return DurationRewardData(is_go_task_page=True, reward_flag=reward_flag_dynamic,
+                                  success_flag="开宝箱奖励已到账",
                                   go_ad_flag=ad_flag, close_flag=close_flag)
-
-    # def get_duration_reward(self) -> bool:
-    #     if not self.go_task_page():
-    #         return False
-    #     close_icon = FindUITargetInfo(ConstViewType.Image, size=(0.075, 0.0333), position=(0.8041, 0.3164),
-    #                                   parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 5})
-    #     go_ad_enter = FindUITargetInfo(ConstViewType.Group, size=(0.5866, 0.0625), position=(0.5, 0.5535),
-    #                                    z_orders={'global': 0, 'local': 3}, parent_name=ConstViewType.Group)
-    #
-    #     def reward_ad_video() -> bool:
-    #         if self.device.click_by_flag(go_ad_enter, 4):
-    #             self.reward_ad_video_item()
-    #             return True
-    #         return False
-    #
-    #     if self.device.click_by_flag(ConstFlag.Desc + "开宝箱得金币", 2):  # 方式一
-    #         reward_ad_video()
-    #         return True
-    #
-    #     reward_icon = FindUITargetInfo(ConstViewType.Texture, size=(0.2641, 0.0711), position=(0.8475, 0.8962),
-    #                                    z_orders={'global': 0, 'local': 3}, parent_name=ConstViewType.Group)
-    #     if self.device.click_by_flag(reward_icon, 1):  # 方式二
-    #         reward_ad_video()
-    #         return True
-    #     self.device.click_by_flag(close_icon, 1)
-    #     return False
 
     def every_time_clear(self):
         pass
