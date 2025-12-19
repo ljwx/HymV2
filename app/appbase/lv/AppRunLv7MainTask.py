@@ -1,11 +1,8 @@
-import traceback
-from abc import abstractmethod
-
-from app.appbase.lv.AppRunLv7MainTask import AppRunLv7MainTask
+from app.appbase.lv.AppRunLv6AdVideo import AppRunLv6AdVideo
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 
 
-class AppRunCommonBiz(AppRunLv7MainTask):
+class AppRunLv7MainTask(AppRunLv6AdVideo):
     def __init__(self, app_info: AppPackageInfo, device: DeviceManager):
         super().__init__(app_info, device)

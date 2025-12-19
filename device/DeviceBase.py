@@ -252,6 +252,7 @@ class DeviceBase(DeviceRandomConfig):
     def __exist_by_image(self, image_path: str, threshold=0.75, timeout: float = default_wait_view_timeout) -> \
             tuple[float, float] | None:
         try:
+            self.logd("开始查找图片", image_path)
             abs_path = str(Path(self.__get_resource_path(image_path)).resolve())
             if not os.path.exists(abs_path):
                 Log.d_view_exists(f"图片文件不存在: {abs_path}")

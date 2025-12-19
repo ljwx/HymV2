@@ -97,14 +97,10 @@ class AppRunBase(ABC):
         self.start_video_task()
 
     def __check_in(self) -> bool:
-        self.logd("===准备签到===")
         if not self.__is_check_in():
-            self.logd("现在执行签到")
             result = self.execute_check_in()
             if result:
                 JsonCacheUtils.set_flag_today(self.app_info.name, True, cache_path="check_in")
-            self.logd("签到结果", result)
-            self.logd("===签到执行完毕===", "enter")
             return result
         return False
 
@@ -117,11 +113,9 @@ class AppRunBase(ABC):
 
     def __get_balance(self):
         if not self.__is_get_balance():
-            self.logd("去获取余额")
             balance = self.execute_get_balance()
             if balance:
                 JsonCacheUtils.set_flag_today(self.app_info.name, balance, cache_path="balance")
-            self.logd("余额", balance)
 
     def __is_get_balance(self) -> bool:
         balance = JsonCacheUtils.get_flag_today(self.app_info.name, cache_path="balance", default="")
