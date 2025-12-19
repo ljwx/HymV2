@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
 from app.appbase.data.ViewFlagsData import AppLaunchDialogData
-from app.appbase.lv.AppRunLvCommon import AppRunLvCommon
+from app.appbase.lv.AppRunLv0Common import AppRunLvCommon
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 

@@ -115,12 +115,12 @@ class DouYinApp(AppRunFather):
                                                parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 1},
                                                desc="反馈按钮")
         close_ad_flag = ConstFlag.Desc + "领取成功，关闭，按钮"
-        next_ad_flag = FindUITargetInfo(ConstViewType.Group, size=(0.7583333333333333, 0.3928), position=(0.5, 0.4632),
+        next_ad_flag = FindUITargetInfo(ConstViewType.Group, size=(0.7583, 0.3928), position=(0.5, 0.4632),
                                         offset_y=0.2, desc="再看一个的领取按钮")
         next_ad_close = FindUITargetInfo(ConstViewType.Image, size=(0.065, 0.0292), position=(0.8033, 0.3741),
                                          parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3},
                                          desc="再看一个的关闭按钮")
-        final_close = FindUITargetInfo(ConstViewType.Group, size=(0.7583333333333333, 0.3928), position=(0.5, 0.4632),
+        final_close = FindUITargetInfo(ConstViewType.Group, size=(0.7583, 0.3928), position=(0.5, 0.4632),
                                        offset_y=0.35, desc="再看一个的坚持退出按钮")
         return RewardVideoAdItemData(start_success_flag=[start_success_flag, start_success_flag2],
                                      wait_time_range=35,
@@ -129,37 +129,16 @@ class DouYinApp(AppRunFather):
                                      close_flag=[close_ad_flag],
                                      final_close_flag=[close_ad_flag, final_close])
 
-    # def reward_ad_video_item(self) -> bool:
-    #
-    #     def ad_page_back():
-    #         self.device.click_by_flag(self.id_prefix + "iv_back", 1)
-    #
-    #     def first_video() -> bool:
-    #         if self.device.find_all_contain_name(ConstViewType.Group, "秒后可领奖励", 4):
-    #             self.device.sleep_operation_random(random.randint(33, 39))
-    #             ad_page_back()
-    #             if self.device.click_by_flag(ConstFlag.Desc + "领取成功，关闭，按钮", 4):
-    #                 ad_page_back()
-    #                 self.device.click_by_flag(
-    #                     FindUITargetInfo(ConstViewType.Image, size=(0.065, 0.0292), position=(0.8033, 0.3741),
-    #                                      parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3}), 1)
-    #             ad_page_back()
-    #         return False
-    #
-    #     def second_video() -> bool:
-    #         if self.device.click_by_flag(self.resource_dir + "video_ad_second_flag.png", 4):
-    #             self.device.sleep_task_random(3)
-    #             first_video()
-    #
-    #     for i in range(2):
-    #         first_video()
-    #         second_video()
-    #         ad_page_back()
-    #     close_ad_icon = FindUITargetInfo(ConstViewType.Image, size=(0.065, 0.0292), position=(0.8033, 0.3741),
-    #                                      parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 3})
-    #     self.device.click_by_flag(close_ad_icon, 1)
-    #     self.device.click_by_flag(close_ad_icon, 1)
-    #     return True
+    def get_duration_reward(self) -> bool:
+        super().get_duration_reward()
+        target_info = FindUITargetInfo(ConstViewType.Group, contains_desc="看视频赚超多钱",
+                                       desc="看视频赚超多钱")
+        success_flag = FindUITargetInfo(ConstViewType.Group, size=(0.4891, 0.0288), position=(0.5, 0.4966),
+                                        parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 5},
+                                        desc="还可再赚的描述")
+        close_icon = FindUITargetInfo(ConstViewType.Image, size=(0.075, 0.0333), position=(0.8041, 0.2985),
+                                      parent_name=ConstViewType.Group, z_orders={'global': 0, 'local': 8},
+                                      desc="直接关闭")
 
     def get_duration_reward_flags(self) -> DurationRewardData:
         reward_flag_dynamic = FindUITargetInfo(ConstViewType.Texture, size=(0.2641, 0.0711), position=(0.8475, 0.8962),

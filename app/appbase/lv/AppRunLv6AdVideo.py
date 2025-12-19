@@ -74,7 +74,6 @@ class AppRunLv6AdVideo(AppRunLv5DurationReward):
                 self.device.click_by_flag(close_flag, 1)
             final_close()
             result = True
-        execute_next_ad()
         final_close()
         self.logd("===单个广告结束===", "enter")
         return result

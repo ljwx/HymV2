@@ -123,7 +123,7 @@ class KuaiShouApp(AppRunFather):
 
     def get_duration_reward(self) -> bool:
         super().get_duration_reward()
-        reward_lite = FindUITargetInfo(ConstViewType.Text, contains_text="金币立即领取")
+        reward_lite = FindUITargetInfo(ConstViewType.Text, contains_text="金币立即领取", desc="领金币按钮")
         close_icon = FindUITargetInfo(ConstViewType.Text, size=(0.07833, 0.0367), position=(0.9275, 0.2250),
                                       parent_name=ConstViewType.View, z_orders={'global': 0, 'local': 0})
         if self.device.click_by_flag(reward_lite):
