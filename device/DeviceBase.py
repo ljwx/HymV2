@@ -1,5 +1,6 @@
 import ast
 import os
+import random
 import warnings
 from abc import abstractmethod
 from datetime import datetime
@@ -185,21 +186,31 @@ class DeviceBase(DeviceRandomConfig):
             return ""
 
     def flag_is_id(self, flag: str) -> bool:
+        if not isinstance(flag, str):
+            return False
         return flag.startswith("com.")
 
     def flag_is_image(self, flag: str) -> bool:
+        if not isinstance(flag, str):
+            return False
         return flag.lower().endswith(".png") or flag.lower().endswith(".jpg") or flag.lower().endswith(".jpeg")
 
     def flag_is_desc(self, flag: str) -> bool:
+        if not isinstance(flag, str):
+            return False
         return flag.startswith(ConstFlag.Desc)
 
     def flag_is_position(self, flag: str) -> bool:
+        if not isinstance(flag, str):
+            return False
         return flag.startswith(ConstFlag.Position)
 
     def flag_is_find_info(self, flag: FindUITargetInfo) -> bool:
         return isinstance(flag, FindUITargetInfo)
 
     def flag_is_back(self, flag: str) -> bool:
+        if not isinstance(flag, str):
+            return False
         return flag.startswith(ConstFlag.Back)
 
     def __execute_exist_by_flag(self, flag: str, element: UIObjectProxy | None) -> UIObjectProxy | None:
@@ -453,7 +464,7 @@ class DeviceBase(DeviceRandomConfig):
             return selected
         return False
 
-    def swipe_up(self):
+    def swipe_up(self, level=1):
         start_x = self._get_swipe_vertical_random_x()
         start_y = self._get_swipe_vertical_random_y_start(is_up=True)
         end_x = self._get_swipe_vertical_random_x()
