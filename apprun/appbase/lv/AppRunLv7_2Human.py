@@ -2,8 +2,8 @@ import random
 from abc import abstractmethod
 from time import sleep
 
-from app.appbase.data.ViewFlagsData import MainTaskHumanData
-from app.appbase.lv.AppRunLv7_1Duration import AppRunLv7_1Duration
+from apprun.appbase.data.ViewFlagsData import MainTaskHumanData
+from apprun.appbase.lv.AppRunLv7_1Duration import AppRunLv7_1Duration
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 from device.operation.UIOperation import UIOperation, Operation

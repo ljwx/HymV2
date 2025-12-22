@@ -4,8 +4,8 @@ from time import sleep
 
 from poco.proxy import UIObjectProxy
 
-from app.appbase.AppRunCommon import AppRunCommon
-from app.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData
+from apprun.appbase.AppRunCommon import AppRunCommon
+from apprun.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData
 from apppackage.AppPackage import AppInfoKuaiShou
 from constant.Const import ConstViewType, ConstFlag
 from device.DeviceManager import DeviceManager

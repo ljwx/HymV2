@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
-from app.appbase.data.ViewFlagsData import DurationRewardData
-from app.appbase.lv.AppRunLv4GetBalance import AppRunLv4GetBalance
+from apprun.appbase.data.ViewFlagsData import DurationRewardData
+from apprun.appbase.lv.AppRunLv4GetBalance import AppRunLv4GetBalance
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 

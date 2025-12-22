@@ -1,6 +1,6 @@
 import asyncio
 
-from app.appbase.lv.AppRunLv6AdVideo import AppRunLv6AdVideo
+from apprun.appbase.lv.AppRunLv6AdVideo import AppRunLv6AdVideo
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 

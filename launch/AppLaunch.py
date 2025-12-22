@@ -3,8 +3,8 @@ import traceback
 from time import sleep
 from typing import Callable, Any
 
-from app.douyin.DouYinApp import DouYinApp
-from app.kuaishou.KuaiShouApp import KuaiShouApp
+from apprun.douyin.DouYinApp import DouYinApp
+from apprun.kuaishou.KuaiShouApp import KuaiShouApp
 from device.DeviceInfo import Mi15, HwP40
 from device.DeviceManager import DeviceManager
 from logevent.Log import Log

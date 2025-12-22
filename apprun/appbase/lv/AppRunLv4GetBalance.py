@@ -1,8 +1,8 @@
 import traceback
 from abc import abstractmethod
 
-from app.appbase.data.ViewFlagsData import GetBalanceData
-from app.appbase.lv.AppRunLv3CheckIn import AppRunLv3CheckIn
+from apprun.appbase.data.ViewFlagsData import GetBalanceData
+from apprun.appbase.lv.AppRunLv3CheckIn import AppRunLv3CheckIn
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 

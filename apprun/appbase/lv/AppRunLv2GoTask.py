@@ -1,8 +1,8 @@
 from abc import abstractmethod
 from time import sleep
 
-from app.appbase.data.ViewFlagsData import MainTaskPageData
-from app.appbase.lv.AppRunLv1GoMainHome import AppRunLv1GoHome
+from apprun.appbase.data.ViewFlagsData import MainTaskPageData
+from apprun.appbase.lv.AppRunLv1GoMainHome import AppRunLv1GoHome
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 

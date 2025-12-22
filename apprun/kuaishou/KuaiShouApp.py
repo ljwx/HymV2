@@ -2,8 +2,8 @@ import asyncio
 import random
 from time import sleep
 
-from app.appbase.AppRunFather import AppRunFather
-from app.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData, \
+from apprun.appbase.AppRunFather import AppRunFather
+from apprun.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData, \
     RewardVideoAdItemData, StartVideoTaskData, DurationRewardData, CheckInData, GetBalanceData, GoAnotherPageData
 from apppackage.AppPackage import AppInfoKuaiShou
 from constant.Const import ConstViewType, ConstFlag

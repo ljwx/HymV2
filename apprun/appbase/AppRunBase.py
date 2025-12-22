@@ -59,7 +59,6 @@ class AppRunBase(ABC):
     def common_step(self) -> bool:
         first_check_in = random.random() < self.first_check_in_probably
         self.logd("是否先签到", first_check_in)
-        self.logd("处理启动后弹窗")
         self.handle_launch_dialog()
 
         def check_in() -> bool:

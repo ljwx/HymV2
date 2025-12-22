@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
-from app.appbase.data.ViewFlagsData import CheckInData
-from app.appbase.lv.AppRunLv2GoTask import AppRunLv2GoTask
+from apprun.appbase.data.ViewFlagsData import CheckInData
+from apprun.appbase.lv.AppRunLv2GoTask import AppRunLv2GoTask
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 

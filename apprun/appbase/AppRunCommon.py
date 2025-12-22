@@ -3,8 +3,8 @@ import random
 from abc import ABC, abstractmethod
 from time import sleep
 
-from app.appbase.AppRunBase import AppRunBase
-from app.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData
+from apprun.appbase.AppRunBase import AppRunBase
+from apprun.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 from device.operation.UIOperation import UIOperation, Operation

@@ -7,12 +7,20 @@
     "2025-12-19": {
       "value": "64882",
       "ts_str": "2025-12-19 00:01:57"
+    },
+    "2025-12-22": {
+      "value": "66830",
+      "ts_str": "2025-12-22 10:53:57"
     }
   },
   "douyin": {
     "2025-12-18": {
       "value": "/Users/tzm/developer/python/project/HymV2/app/douyin/snapshot/balance/2025_12_18_21_36_20.jpg",
       "ts_str": "2025-12-18 21:38:15"
+    },
+    "2025-12-22": {
+      "value": "/Users/tianzhaoming/developer/python/project/HymV2/apprun/douyin/snapshot/balance/2025_12_22_10_52_46.jpg",
+      "ts_str": "2025-12-22 11:23:39"
     }
   }
 }

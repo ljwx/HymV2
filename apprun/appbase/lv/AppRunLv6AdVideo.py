@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
-from app.appbase.data.ViewFlagsData import RewardVideoAdItemData, StartVideoTaskData
-from app.appbase.lv.AppRunLv5DurationReward import AppRunLv5DurationReward
+from apprun.appbase.data.ViewFlagsData import RewardVideoAdItemData, StartVideoTaskData
+from apprun.appbase.lv.AppRunLv5DurationReward import AppRunLv5DurationReward
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 

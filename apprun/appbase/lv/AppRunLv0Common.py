@@ -1,5 +1,5 @@
-from app.appbase.AppRunCommon import AppRunCommon
-from app.appbase.data.ViewFlagsData import GoAnotherPageData
+from apprun.appbase.AppRunCommon import AppRunCommon
+from apprun.appbase.data.ViewFlagsData import GoAnotherPageData
 from apppackage.AppPackage import AppPackageInfo
 from device.DeviceManager import DeviceManager
 

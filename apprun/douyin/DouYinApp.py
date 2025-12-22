@@ -3,8 +3,8 @@ import random
 from pathlib import Path
 from time import sleep
 
-from app.appbase.AppRunFather import AppRunFather
-from app.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData, \
+from apprun.appbase.AppRunFather import AppRunFather
+from apprun.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData, \
     CheckInData, DurationRewardData, GetBalanceData, RewardVideoAdItemData, StartVideoTaskData
 from apppackage.AppPackage import AppInfoDouYin
 from constant.Const import ConstViewType, ConstFlag
