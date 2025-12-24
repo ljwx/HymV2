@@ -3,7 +3,9 @@ import random
 from time import sleep
 
 from apprun.appbase.AppRunFather import AppRunFather
-from apprun.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData, \
+from apprun.appbase.data.ParamsData import IsGoTaskPageData
+from apprun.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, \
+    AppLaunchDialogData, \
     RewardVideoAdItemData, StartVideoTaskData, DurationRewardData, CheckInData, GetBalanceData, GoAnotherPageData
 from apppackage.AppPackage import AppInfoKuaiShou
 from constant.Const import ConstViewType, ConstFlag
@@ -98,7 +100,7 @@ class KuaiShouApp(AppRunFather):
             works_list_flag=self.id_prefix + "recycler_view")
 
     def get_start_video_task_flags(self) -> StartVideoTaskData:
-        return StartVideoTaskData(is_go_home_page=True, is_go_task_pag=True, enter_flag=["看广告得金币"])
+        return StartVideoTaskData(is_go_home_page=True, is_go_task_page=True, enter_flag=["看广告得金币"])
 
     def get_reward_ad_video_item_flags(self) -> RewardVideoAdItemData:
         close_ad_flag = self.ad_id_prefix + "video_countdown_end_icon"

@@ -4,7 +4,9 @@ from pathlib import Path
 from time import sleep
 
 from apprun.appbase.AppRunFather import AppRunFather
-from apprun.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData, \
+from apprun.appbase.data.ParamsData import IsGoTaskPageData
+from apprun.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, \
+    AppLaunchDialogData, \
     CheckInData, DurationRewardData, GetBalanceData, RewardVideoAdItemData, StartVideoTaskData
 from apppackage.AppPackage import AppInfoDouYin
 from constant.Const import ConstViewType, ConstFlag
@@ -107,7 +109,7 @@ class DouYinApp(AppRunFather):
     def get_start_video_task_flags(self) -> StartVideoTaskData:
         enter_flag = FindUITargetInfo(ConstViewType.Group, contains_desc="分钟完成一次", desc="视频广告入口1")
         enter_standby = FindUITargetInfo(ConstViewType.Group, contains_desc="看广告视频，本次可得", desc="视频广告入口2")
-        return StartVideoTaskData(is_go_home_page=True, is_go_task_pag=True, enter_flag=[enter_flag, enter_standby])
+        return StartVideoTaskData(is_go_home_page=True, is_go_task_page=True, enter_flag=[enter_flag, enter_standby])
 
     def get_reward_ad_video_item_flags(self) -> RewardVideoAdItemData:
         start_success_flag = FindUITargetInfo(ConstViewType.Group, contains_desc="秒后可领奖励", desc="读秒倒计时")

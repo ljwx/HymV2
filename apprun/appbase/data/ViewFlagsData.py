@@ -1,13 +1,7 @@
 import dataclasses
 
+from apprun.appbase.data.ParamsData import GoAnotherPageData, IsGoTaskPageData
 from device.uiview.FindUIInfo import FindUITargetInfo
-
-
-@dataclasses.dataclass
-class GoAnotherPageData:
-    need_enter_another_page: bool = True
-    enter_another_page_flag: str | FindUITargetInfo | None = None
-    another_page_success_flag: str | FindUITargetInfo | None = None
 
 
 @dataclasses.dataclass
@@ -63,7 +57,7 @@ class GetBalanceData:
 @dataclasses.dataclass
 class StartVideoTaskData:
     is_go_home_page: bool
-    is_go_task_pag: bool
+    is_go_task_page: bool
     enter_flag: list[str | FindUITargetInfo]
 
 

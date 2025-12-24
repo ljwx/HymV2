@@ -61,8 +61,8 @@ class AppRunBase(ABC):
         self.logd("是否先签到", first_check_in)
         self.handle_launch_dialog()
 
-        def check_in() -> bool:
-            if not self.__is_check_in() and self.go_task_page():
+        def check_in():
+            if not self.__is_check_in():
                 self.__check_in()
                 self.__get_balance()
 
@@ -74,7 +74,7 @@ class AppRunBase(ABC):
             check_in()
         self.__get_balance()
         self.get_duration_reward()
-        if random.random() < self.execute_ad_reward_probably and self.go_task_page():
+        if random.random() < self.execute_ad_reward_probably:
             times = random.randint(1, 3)
             self.logd("执行视频广告任务", str(times), "次")
             for i in range(times):

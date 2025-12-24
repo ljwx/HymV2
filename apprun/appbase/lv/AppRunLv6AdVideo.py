@@ -30,7 +30,7 @@ class AppRunLv6AdVideo(AppRunLv5DurationReward):
             if not self.go_main_home_page(select_tab=False):
                 return
 
-        if flags.is_go_task_pag and self.go_task_page():
+        if flags.is_go_task_page and self.go_task_page():
             if enter_success():
                 return
             else:
