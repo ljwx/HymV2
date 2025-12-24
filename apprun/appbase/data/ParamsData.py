@@ -16,8 +16,9 @@ class IsGoTaskPageData:
     first_close_ad_flag: bool
 
 
+@dataclasses.dataclass
 class CloseDialogData:
-    common_flag: list[str | FindUITargetInfo] | None
-    home_page_dialog_flags: list[str | FindUITargetInfo] | None
-    task_page_dialog_flags: list[str | FindUITargetInfo] | None
-    task_page_skip_close_dialog_flags: list[str | FindUITargetInfo] | None
+    common_dialog_flag: list[str | FindUITargetInfo] | None = None
+    home_page_dialog_flags: list[str | FindUITargetInfo] | None = None
+    task_page_dialog_flags: list[str | FindUITargetInfo] | None = None
+    task_page_skip_close_dialog_flags: list[str | FindUITargetInfo] | None = None

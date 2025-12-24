@@ -25,8 +25,9 @@ class AppRunLvCommon(AppRunCommon):
     def close_task_page_dialog(self):
         flags = self.get_close_page_dialog_flags()
         skip = False
-        if flags.task_page_skip_close_dialog_flags is not None:
-            if self.device.exist_by_flags_or(flags.task_page_skip_close_dialog_flags):
+        skip_flags = flags.task_page_skip_close_dialog_flags
+        if skip_flags is not None and len(skip_flags) > 0:
+            if self.device.exist_by_flags_or(skip_flags):
                 skip = True
         if not skip:
             self.device.click_by_flags_or(flags.task_page_dialog_flags)

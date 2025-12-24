@@ -4,7 +4,7 @@ from pathlib import Path
 from time import sleep
 
 from apprun.appbase.AppRunFather import AppRunFather
-from apprun.appbase.data.ParamsData import IsGoTaskPageData
+from apprun.appbase.data.ParamsData import IsGoTaskPageData, CloseDialogData
 from apprun.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, \
     AppLaunchDialogData, \
     CheckInData, DurationRewardData, GetBalanceData, RewardVideoAdItemData, StartVideoTaskData
@@ -35,6 +35,10 @@ class DouYinApp(AppRunFather):
     def get_handle_launch_dialog_flag(self) -> AppLaunchDialogData:
         return AppLaunchDialogData(close_flags=[])
 
+    def get_close_page_dialog_flags(self) -> CloseDialogData:
+        return CloseDialogData(task_page_dialog_flags=[],
+                               task_page_skip_close_dialog_flags=[])
+
     def get_main_home_page_flag(self) -> MainHomePageData:
         return MainHomePageData(main_home_page_flag=self.id_prefix + "root_view", main_home_tab_flag="首页",
                                 main_home_page_intercept_flag=None)
@@ -47,7 +51,7 @@ class DouYinApp(AppRunFather):
                                              parent_name=ConstViewType.Frame, z_orders={'global': 0, 'local': 1},
                                              desc="宝箱")
         return MainTaskPageData(first_go_main_page=True, task_page_enter_flag=task_tab_icon,
-                                is_text_and_can_selected=False, task_page_ad_flag=[],
+                                is_text_and_can_selected=False,
                                 task_page_success_flag=task_page_success)
 
     def get_execute_check_in_flags(self) -> CheckInData:

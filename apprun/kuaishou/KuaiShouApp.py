@@ -3,7 +3,7 @@ import random
 from time import sleep
 
 from apprun.appbase.AppRunFather import AppRunFather
-from apprun.appbase.data.ParamsData import IsGoTaskPageData
+from apprun.appbase.data.ParamsData import IsGoTaskPageData, CloseDialogData
 from apprun.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, \
     AppLaunchDialogData, \
     RewardVideoAdItemData, StartVideoTaskData, DurationRewardData, CheckInData, GetBalanceData, GoAnotherPageData
@@ -43,6 +43,10 @@ class KuaiShouApp(AppRunFather):
     def get_handle_launch_dialog_flag(self) -> AppLaunchDialogData:
         return AppLaunchDialogData(close_flags=[self.id_prefix + "close_btn"])
 
+    def get_close_page_dialog_flags(self) -> CloseDialogData:
+        return CloseDialogData(task_page_dialog_flags=[self.task_page_close_icon],
+                               task_page_skip_close_dialog_flags=[self.check_in_icon])
+
     def get_main_home_page_flag(self) -> MainHomePageData:
         return MainHomePageData(main_home_page_flag=self.id_prefix + "bottom_bar_container", main_home_tab_flag="首页",
                                 main_home_page_intercept_flag=None)
@@ -50,7 +54,6 @@ class KuaiShouApp(AppRunFather):
     def get_task_page_flag(self) -> MainTaskPageData:
         ["瓜分百亿金币", ""]
         return MainTaskPageData(first_go_main_page=True, task_page_enter_flag="去赚钱", is_text_and_can_selected=True,
-                                task_page_ad_flag=[self.task_page_close_icon, self.close_icon],
                                 task_page_success_flag="任务中心")
 
     def get_execute_check_in_flags(self) -> CheckInData:

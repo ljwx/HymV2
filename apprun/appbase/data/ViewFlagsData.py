@@ -21,7 +21,6 @@ class MainTaskPageData:
     first_go_main_page: bool
     task_page_enter_flag: str | FindUITargetInfo
     is_text_and_can_selected: bool
-    task_page_ad_flag: list[str | FindUITargetInfo] | None
     task_page_success_flag: str | FindUITargetInfo
 
 
