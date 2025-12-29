@@ -32,7 +32,7 @@ class AppRunLv2GoTask(AppRunLv1GoHome):
             selected = self.device.is_text_selected(flag.task_page_enter_flag)
             if selected or self.device.click_by_flag(flag.task_page_enter_flag):
                 sleep(4)
-        for ad in flag.task_page_ad_flag:
+        for ad in self.get_close_page_dialog_flags().task_page_dialog_flags:
             self.logd("关闭广告")
             self.device.click_by_flag(ad, 1)
         if self.device.exist_by_flag(flag.task_page_success_flag, 2):

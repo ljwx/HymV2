@@ -19,6 +19,10 @@
     "2025-12-24": {
       "value": "72334",
       "ts_str": "2025-12-24 15:12:14"
+    },
+    "2025-12-29": {
+      "value": "73265",
+      "ts_str": "2025-12-29 17:02:19"
     }
   },
   "douyin": {
@@ -33,6 +37,10 @@
     "2025-12-24": {
       "value": "/Users/tianzhaoming/developer/python/project/HymV2/apprun/douyin/snapshot/balance/2025_12_24_15_32_28.jpg",
       "ts_str": "2025-12-24 15:46:53"
+    },
+    "2025-12-29": {
+      "value": "/Users/tianzhaoming/developer/python/project/HymV2/apprun/douyin/snapshot/balance/2025_12_29_16_52_52.jpg",
+      "ts_str": "2025-12-29 17:19:58"
     }
   }
 }
