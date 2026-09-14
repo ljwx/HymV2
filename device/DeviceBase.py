@@ -1,5 +1,6 @@
 import ast
 import os
+import random
 import warnings
 from abc import abstractmethod
 from datetime import datetime
@@ -182,21 +183,31 @@ class DeviceBase(DeviceRandomConfig):
             return ""
 
     def flag_is_id(self, flag: str) -> bool:
+        if not isinstance(flag, str):
+            return False
         return flag.startswith("com.")
 
     def flag_is_image(self, flag: str) -> bool:
+        if not isinstance(flag, str):
+            return False
         return flag.lower().endswith(".png") or flag.lower().endswith(".jpg") or flag.lower().endswith(".jpeg")
 
     def flag_is_desc(self, flag: str) -> bool:
+        if not isinstance(flag, str):
+            return False
         return flag.startswith(ConstFlag.Desc)
 
     def flag_is_position(self, flag: str) -> bool:
+        if not isinstance(flag, str):
+            return False
         return flag.startswith(ConstFlag.Position)
 
     def flag_is_find_info(self, flag: FindUITargetInfo) -> bool:
         return isinstance(flag, FindUITargetInfo)
 
     def flag_is_back(self, flag: str) -> bool:
+        if not isinstance(flag, str):
+            return False
         return flag.startswith(ConstFlag.Back)
 
     def __execute_exist_by_flag(self, flag: str, element: UIObjectProxy | None) -> UIObjectProxy | None:
@@ -249,6 +260,7 @@ class DeviceBase(DeviceRandomConfig):
     def __exist_by_image(self, image_path: str, threshold=0.75, timeout: float = default_wait_view_timeout) -> \
             tuple[float, float] | None:
         try:
+            self.logd("开始查找图片", image_path)
             abs_path = str(Path(self.__get_resource_path(image_path)).resolve())
             if not os.path.exists(abs_path):
                 Log.d_view_exists(f"图片文件不存在: {abs_path}")
@@ -292,6 +304,7 @@ class DeviceBase(DeviceRandomConfig):
         except Exception as e:
             Log.d_view_exists(f"{COLOR_RED}查找节点异常: {ui_info.ui_name}, 错误: {e}{COLOR_RESET}")
             return None
+        self.logd("开始查找ui", ui_info.desc)
         for type in types:
             size_match = True
             position_match = True
@@ -302,14 +315,14 @@ class DeviceBase(DeviceRandomConfig):
             if ui_info.size is not None:
                 if not self.__size_match(type.get_size(), ui_info.size):
                     size_match = False
-            if ui_info.position is not None:
+            if size_match and ui_info.position is not None:
                 if not self.__position_match(type.get_position(), ui_info.position):
                     position_match = False
-            if ui_info.parent_name is not None:
+            if size_match and position_match and ui_info.parent_name is not None:
                 parent = type.parent()
                 if not parent.exists() or not parent.attr("type") == ui_info.parent_name:
                     parent_match = False
-            if ui_info.z_orders is not None:
+            if size_match and position_match and parent_match and ui_info.z_orders is not None:
                 z_orders_match = False
                 zord = type.attr("zOrders")
                 if isinstance(zord, dict):
@@ -317,7 +330,7 @@ class DeviceBase(DeviceRandomConfig):
                     _local = zord.get("local") == ui_info.z_orders.get("local")
                     if _global and _local:
                         z_orders_match = True
-            if ui_info.contains_text is not None:
+            if size_match and position_match and parent_match and z_orders_match and ui_info.contains_text is not None:
                 try:
                     text = type.get_text()
                     if text is not None and text.strip().__contains__(ui_info.contains_text):
@@ -326,7 +339,7 @@ class DeviceBase(DeviceRandomConfig):
                         content_match = False
                 except Exception as e:
                     content_match = False
-            if ui_info.contains_desc is not None:
+            if size_match and position_match and parent_match and z_orders_match and ui_info.contains_desc is not None:
                 try:
                     text = type.attr("desc")
                     if text is not None and text.strip().__contains__(ui_info.contains_desc):
@@ -340,6 +353,7 @@ class DeviceBase(DeviceRandomConfig):
                 return type
             # if size_match and position_match:
             #     print(zord, type.parent().attr("type"))
+        self.logd("通过ui_info没找到", str(ui_info.desc) if ui_info.desc is not None else "")
         return None
 
     def exist_by_flag(self, flag: str | FindUITargetInfo,
@@ -400,11 +414,14 @@ class DeviceBase(DeviceRandomConfig):
         # touch(template, timeout=timeout)
         return False
 
-    def __click_by_find_info(self, ui_info: FindUITargetInfo, timeout=3, offset_y: float | None = None) -> bool:
+    def __click_by_find_info(self, ui_info: FindUITargetInfo, timeout=3, offset_x: float | None = None,
+                             offset_y: float | None = None) -> bool:
         ui = self.__exist_by_find_info(ui_info, timeout=timeout)
         if ui is not None:
-            if offset_y is not None and offset_y > 0:
-                focus = [0.5, 0.5 + offset_y]
+            if offset_y is not None or offset_x is not None:
+                diff_x = 0 if offset_x is None else offset_x
+                diff_y = 0 if offset_y is None else offset_y
+                focus = [0.5 + diff_x, 0.5 + diff_y]
                 print(focus)
                 ui.click(focus=self.get_touch_position_offset(focus), )
             else:
@@ -415,7 +432,7 @@ class DeviceBase(DeviceRandomConfig):
 
     def click_by_flag(self, flag: str | FindUITargetInfo, timeout=default_wait_view_timeout) -> bool:
         if self.flag_is_find_info(flag):
-            return self.__click_by_find_info(flag, timeout=timeout, offset_y=flag.offset_y)
+            return self.__click_by_find_info(flag, timeout=timeout, offset_x=flag.offset_x, offset_y=flag.offset_y)
         elif self.flag_is_id(flag):
             return self.__click_by_id(flag, timeout=timeout)
         elif self.flag_is_image(flag):
@@ -444,7 +461,7 @@ class DeviceBase(DeviceRandomConfig):
             return selected
         return False
 
-    def swipe_up(self):
+    def swipe_up(self, level=1):
         start_x = self._get_swipe_vertical_random_x()
         start_y = self._get_swipe_vertical_random_y_start(is_up=True)
         end_x = self._get_swipe_vertical_random_x()

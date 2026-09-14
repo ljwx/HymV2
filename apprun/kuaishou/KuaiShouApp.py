@@ -2,8 +2,10 @@ import asyncio
 import random
 from time import sleep
 
-from app.appbase.AppRunFather import AppRunFather
-from app.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, AppLaunchDialogData, \
+from apprun.appbase.AppRunFather import AppRunFather
+from apprun.appbase.data.ParamsData import IsGoTaskPageData, CloseDialogData
+from apprun.appbase.data.ViewFlagsData import MainHomePageData, MainTaskPageData, MainTaskHumanData, \
+    AppLaunchDialogData, \
     RewardVideoAdItemData, StartVideoTaskData, DurationRewardData, CheckInData, GetBalanceData, GoAnotherPageData
 from apppackage.AppPackage import AppInfoKuaiShou
 from constant.Const import ConstViewType, ConstFlag
@@ -41,6 +43,10 @@ class KuaiShouApp(AppRunFather):
     def get_handle_launch_dialog_flag(self) -> AppLaunchDialogData:
         return AppLaunchDialogData(close_flags=[self.id_prefix + "close_btn"])
 
+    def get_close_page_dialog_flags(self) -> CloseDialogData:
+        return CloseDialogData(task_page_dialog_flags=[self.task_page_close_icon],
+                               task_page_skip_close_dialog_flags=[self.check_in_icon])
+
     def get_main_home_page_flag(self) -> MainHomePageData:
         return MainHomePageData(main_home_page_flag=self.id_prefix + "bottom_bar_container", main_home_tab_flag="首页",
                                 main_home_page_intercept_flag=None)
@@ -48,7 +54,6 @@ class KuaiShouApp(AppRunFather):
     def get_task_page_flag(self) -> MainTaskPageData:
         ["瓜分百亿金币", ""]
         return MainTaskPageData(first_go_main_page=True, task_page_enter_flag="去赚钱", is_text_and_can_selected=True,
-                                task_page_ad_flag=[self.task_page_close_icon, self.close_icon],
                                 task_page_success_flag="任务中心")
 
     def get_execute_check_in_flags(self) -> CheckInData:
@@ -98,7 +103,7 @@ class KuaiShouApp(AppRunFather):
             works_list_flag=self.id_prefix + "recycler_view")
 
     def get_start_video_task_flags(self) -> StartVideoTaskData:
-        return StartVideoTaskData(is_go_home_page=True, is_go_task_pag=True, enter_flag="看广告得金币")
+        return StartVideoTaskData(is_go_home_page=True, is_go_task_page=True, enter_flag=["看广告得金币"])
 
     def get_reward_ad_video_item_flags(self) -> RewardVideoAdItemData:
         close_ad_flag = self.ad_id_prefix + "video_countdown_end_icon"
@@ -123,7 +128,7 @@ class KuaiShouApp(AppRunFather):
 
     def get_duration_reward(self) -> bool:
         super().get_duration_reward()
-        reward_lite = FindUITargetInfo(ConstViewType.Text, contains_text="金币立即领取")
+        reward_lite = FindUITargetInfo(ConstViewType.Text, contains_text="金币立即领取", desc="领金币按钮")
         close_icon = FindUITargetInfo(ConstViewType.Text, size=(0.07833, 0.0367), position=(0.9275, 0.2250),
                                       parent_name=ConstViewType.View, z_orders={'global': 0, 'local': 0})
         if self.device.click_by_flag(reward_lite):

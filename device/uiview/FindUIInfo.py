@@ -5,6 +5,7 @@ class FindUITargetInfo:
                  parent_name: str = None,
                  contains_text: str = None,
                  contains_desc: str = None,
+                 offset_x: float = None,
                  offset_y: float = None,
                  desc: str = None, ):
         self.ui_name = ui_name
@@ -14,5 +15,6 @@ class FindUITargetInfo:
         self.parent_name = parent_name
         self.contains_text = contains_text
         self.contains_desc = contains_desc
+        self.offset_x = offset_x
         self.offset_y = offset_y
         self.desc = desc

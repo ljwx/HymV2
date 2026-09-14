@@ -56,17 +56,17 @@ class DeviceRandomConfig(ABC):
         screen_size = self.get_screen_size()
         width, height = screen_size
         if is_up:
-            return height * random.uniform(0.68, 0.83)
+            return height * random.uniform(0.71, 0.78)
         else:
-            return height * random.uniform(0.23, 0.38)
+            return height * random.uniform(0.25, 0.32)
 
     def _get_swipe_vertical_random_y_end(self, is_up: bool) -> float:
         screen_size = self.get_screen_size()
         width, height = screen_size
         if is_up:
-            return height * random.uniform(0.26, 0.38)
+            return height * random.uniform(0.25, 0.32)
         else:
-            return height * random.uniform(0.64, 0.76)
+            return height * random.uniform(0.71, 0.78)
 
     def _get_swipe_horizontal_random_y(self) -> float:
         screen_size = self.get_screen_size()
