@@ -12,7 +12,9 @@
 | 多了一种广告、普通内容或长内容标记 | 对应 `*_markers` 元组新增 target | 不需要 |
 | 签到多了一个页面层级或另一条路径 | `CheckInSpec.stages` 新增 `CheckInStageSpec` | 不需要 |
 | 多了启动弹窗或首页拦截 | `launch_intercepts` 或 `home_intercepts` 新增 `PopupDismissSpec` | 不需要 |
-| App 出现现有模型完全表达不了的独有任务 | 本 App 文件增加插件子类并实现 `build_app_steps` | 不需要改公共执行器 |
+| 重复点击已选中的首页会刷新或切换模式 | 对应 `NavigationSpec` 设置 `reselect_home_tab=False` | 不需要改公共执行器 |
+| App 的某一个任务机制不同 | 本 App 文件实现任务并替换 `DailyTaskSet` 对应字段 | 不需要改公共执行器 |
+| App 的任务集合或顺序完全不同 | 本 App 文件实现工作流构建器并调用 `create_custom_plugin` | 不需要改公共执行器 |
 | 出现视频、新闻、音频之外的新内容形态 | 新增内容策略及处理器 | 需要先按真实流程设计 |
 
 ## target 和 locator
@@ -67,6 +69,10 @@ PageSpec(
 上例要求两个正向标记都命中，并且不能命中任务页标记。新增第三个辅助标记但只要求其中两个时，
 把它加入 `markers`，继续保持 `minimum_markers=2`。页面标记优先使用稳定 ID、Activity 或固定标题，
 不要使用每天变化的金额、倒计时或任意文章标题作为唯一依据。
+
+如果 App 重复点击已经选中的首页标签会刷新内容或切换展示模式，在该 App 的 `NavigationSpec`
+设置 `reselect_home_tab=False`。页面已经满足 `home_page` 时会直接返回；只有未进入目标首页时，
+导航才会点击一次首页标签。
 
 ## 新增签到分支
 
@@ -127,7 +133,8 @@ ad_markers=(
 ```
 
 新广告标记只能放进 `ad_markers`。同一个页面同时命中广告和普通标记时，广告分类优先，
-并禁止点赞、关注、评论和进入主页。无法分类的视频默认只短暂停留且不互动。
+并禁止点赞、关注、评论和进入主页。无法分类的视频按该 App 配置选择保守观看或疑似广告短暂停留，
+默认不互动。
 
 新闻类 App 的新列表项 ID 放进 `feed_item`，新详情页特征放进 `detail_marker`。
 只有打开后命中详情标记才计为成功浏览，避免把广告卡片或无效卡片算作文章。
@@ -135,35 +142,56 @@ ad_markers=(
 ## 新增 App 独有任务
 
 只有现有签到、余额、时段奖励、广告和内容规格确实无法表达时，才增加专用代码。
-每个 App 文件底部都有 `create_plugin()`，注册表只调用它。可以在同一文件中这样扩展：
+每个 App 文件底部都有 `create_plugin()`，注册表只调用它。单独增加一个任务时，通过组合函数注入：
 
 ```python
+from hym.apps.plugin import create_daily_plugin
 from hym.runtime.workflow import StepDefinition, StepOutcome
 
 
-class KuaishouPlugin(ConfiguredAppPlugin):
-    def build_app_steps(self, context):
-        return (
-            StepDefinition(
-                "快手独有任务",
-                "执行快手独有任务",
-                self._run_unique_task,
-                recovery=self._recover_home,
-            ),
-        )
+def run_unique_task(context):
+    # 在这里按真实页面状态执行，成功、跳过和失败必须明确返回。
+    return StepOutcome.skipped("当前没有可执行的快手独有任务")
 
-    def _run_unique_task(self, context):
-        # 在这里按真实页面状态执行，成功、跳过和失败必须明确返回。
-        return StepOutcome.skipped("当前没有可执行的快手独有任务")
+
+def extra_steps(context):
+    return (
+        StepDefinition(
+            "快手独有任务",
+            "执行快手独有任务",
+            run_unique_task,
+        ),
+    )
 
 
 def create_plugin():
-    return KuaishouPlugin(kuaishou_spec())
+    return create_daily_plugin(kuaishou_spec(), extra_steps=extra_steps)
 ```
 
-`build_app_steps` 返回的步骤默认放在公共奖励任务之后，余额仍可能随机插入。步骤失败后会沿用
-公共链路日志、连续失败诊断和恢复机制。不可重复的新任务要像签到一样在点击前记录每日动作检查点，
-不能只在成功后记录；这类任务最好先结合真实页面设计，不要凭空抽象。
+单个已有任务不同，使用 `create_daily_task_set()` 得到默认集合，再用 `dataclasses.replace()`
+替换 `check_in`、`balance`、`duration_reward`、`ad_reward` 或 `content`。如果任务集合和顺序都不同，
+在 App 文件实现带 `build(context)` 的工作流构建器，并通过 `create_custom_plugin()` 注册；不需要继承
+公共插件。不可重复的新任务要像签到一样在点击前记录每日动作检查点，不能只在成功后记录。
+
+例如只有签到机制不同，其他任务继续复用：
+
+```python
+from dataclasses import replace
+
+from hym.apps.plugin import create_daily_plugin, create_daily_task_set
+from hym.runtime.navigation import NavigationController
+
+
+def create_plugin():
+    spec = example_spec()
+    navigation = NavigationController(spec)
+    tasks = create_daily_task_set(spec, navigation=navigation)
+    tasks = replace(tasks, check_in=run_example_check_in)
+    return create_daily_plugin(spec, navigation=navigation, tasks=tasks)
+```
+
+`run_example_check_in(context)` 只属于该 App，返回统一的 `StepOutcome`。以后发现新签到路径时只改
+这个 App 文件；公共签到组件和其他 App 不受影响。
 
 ## 修改后的检查
 

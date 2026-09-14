@@ -4,15 +4,16 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from hym.apps.app_specs.qutoutiao import QutoutiaoPlugin
-from hym.apps.app_specs.ximalaya import XimalayaPlugin
+from hym.apps.app_specs.qutoutiao import QutoutiaoTaskPageNavigator
+from hym.apps.app_specs.ximalaya import XimalayaPlayback
 from hym.apps.catalog import douyin_spec, kuaishou_spec, qutoutiao_spec, ximalaya_spec
-from hym.apps.plugin import ConfiguredAppPlugin
 from hym.core.models import ActivityInfo, Observation, Point, SystemKey, WorkflowStatus
 from hym.core.pages import PageMatchResult, PageMatchStatus
 from hym.core.targets import LocatorKind, ResolveResult, ResolveStatus, ResolvedTarget
 from hym.runtime.interruption import InterruptionKind, InterruptionRequest, WorkflowYield
+from hym.runtime.audio import DefaultAudioPlayback
 from hym.runtime.navigation import NavigationController
+from hym.runtime.video import VideoContentTask
 
 
 def _found(target, observation):
@@ -196,17 +197,57 @@ def _context(actions):
 class NavigationEfficiencyTest(unittest.TestCase):
     def setUp(self):
         self.spec = kuaishou_spec()
-        self.plugin = ConfiguredAppPlugin(self.spec)
+        self.navigation = NavigationController(self.spec)
+        self.video = VideoContentTask(self.spec.identity, self.spec.video, self.navigation)
 
     def test_home_and_tab_use_one_observation(self):
         actions = StubActions(
             [{self.spec.navigation.home_marker.target_id, self.spec.navigation.home_tab.target_id}]
         )
 
-        self.assertTrue(self.plugin._go_home(_context(actions), select_tab=True))
+        self.assertTrue(self.navigation.go_home(_context(actions), select_tab=True))
 
         self.assertEqual(1, actions.observation_count)
         self.assertEqual([self.spec.navigation.home_tab.target_id], actions.tapped)
+        self.assertEqual([], actions.pressed)
+
+    def test_douyin_does_not_reselect_home_tab_on_video_feed(self):
+        spec = douyin_spec()
+        actions = StubActions(
+            [
+                {
+                    *(target.target_id for target in spec.navigation.home_page.markers),
+                    spec.navigation.home_tab.target_id,
+                }
+            ],
+            packages=[spec.identity.package_name],
+            activities=["SplashActivity"],
+        )
+
+        self.assertTrue(NavigationController(spec).go_home(_context(actions), select_tab=True))
+
+        self.assertEqual(1, actions.observation_count)
+        self.assertEqual([], actions.tapped)
+        self.assertEqual([], actions.pressed)
+
+    def test_douyin_still_selects_home_tab_when_video_feed_is_missing(self):
+        spec = douyin_spec()
+        actions = StubActions(
+            [
+                {spec.navigation.home_tab.target_id},
+                {
+                    *(target.target_id for target in spec.navigation.home_page.markers),
+                    spec.navigation.home_tab.target_id,
+                },
+            ],
+            packages=[spec.identity.package_name, spec.identity.package_name],
+            activities=["SplashActivity", "SplashActivity"],
+        )
+
+        self.assertTrue(NavigationController(spec).go_home(_context(actions), select_tab=True))
+
+        self.assertEqual(2, actions.observation_count)
+        self.assertEqual([spec.navigation.home_tab.target_id], actions.tapped)
         self.assertEqual([], actions.pressed)
 
     def test_missing_home_tab_is_reobserved_before_recovery(self):
@@ -217,7 +258,7 @@ class NavigationEfficiencyTest(unittest.TestCase):
             ]
         )
 
-        self.assertTrue(self.plugin._go_home(_context(actions), select_tab=True))
+        self.assertTrue(self.navigation.go_home(_context(actions), select_tab=True))
 
         self.assertEqual(2, actions.observation_count)
         self.assertEqual([self.spec.navigation.home_tab.target_id], actions.tapped)
@@ -232,7 +273,7 @@ class NavigationEfficiencyTest(unittest.TestCase):
             ]
         )
 
-        self.assertTrue(self.plugin._go_home(_context(actions)))
+        self.assertTrue(self.navigation.go_home(_context(actions)))
 
         self.assertEqual(2, actions.observation_count)
         self.assertEqual([close_target.target_id], actions.tapped)
@@ -246,7 +287,7 @@ class NavigationEfficiencyTest(unittest.TestCase):
             ]
         )
 
-        self.assertTrue(self.plugin._go_home(_context(actions)))
+        self.assertTrue(self.navigation.go_home(_context(actions)))
 
         self.assertEqual(2, actions.observation_count)
         self.assertEqual([self.spec.navigation.home_tab.target_id], actions.tapped)
@@ -259,7 +300,7 @@ class NavigationEfficiencyTest(unittest.TestCase):
         )
         context = _context(actions)
 
-        self.assertTrue(self.plugin._go_home(context))
+        self.assertTrue(self.navigation.go_home(context))
 
         self.assertEqual(["com.kuaishou.nebula"], context.session.starts)
         self.assertEqual([SystemKey.HOME], actions.pressed)
@@ -276,7 +317,7 @@ class NavigationEfficiencyTest(unittest.TestCase):
         )
         context = _context(actions)
 
-        self.assertTrue(ConfiguredAppPlugin(spec)._go_home(context))
+        self.assertTrue(NavigationController(spec).go_home(context))
 
         self.assertEqual([], actions.pressed)
         self.assertEqual([], context.session.starts)
@@ -290,7 +331,7 @@ class NavigationEfficiencyTest(unittest.TestCase):
         )
         context = _context(actions)
 
-        self.assertTrue(ConfiguredAppPlugin(spec)._ensure_audio_playing(context, audio))
+        self.assertTrue(DefaultAudioPlayback().ensure_playing(context, audio))
 
         self.assertEqual(1, actions.observation_count)
         self.assertEqual([], actions.tapped)
@@ -304,7 +345,7 @@ class NavigationEfficiencyTest(unittest.TestCase):
         )
         context = _context(actions)
 
-        self.assertTrue(ConfiguredAppPlugin(spec)._ensure_audio_playing(context, audio))
+        self.assertTrue(DefaultAudioPlayback().ensure_playing(context, audio))
 
         self.assertEqual(1, actions.observation_count)
         self.assertEqual([audio.resume_target.target_id], actions.tapped)
@@ -319,26 +360,30 @@ class NavigationEfficiencyTest(unittest.TestCase):
         )
         context = _context(actions)
 
-        self.assertTrue(XimalayaPlugin(spec)._ensure_audio_playing(context, audio))
+        self.assertTrue(
+            XimalayaPlayback(DefaultAudioPlayback()).ensure_playing(context, audio)
+        )
 
         self.assertEqual(2, actions.observation_count)
         self.assertEqual([audio.resume_target.target_id], actions.tapped)
         self.assertEqual(2, context.timing.operation_delays)
 
     def test_qutoutiao_retries_task_navigation_after_handling_ad(self):
-        plugin = QutoutiaoPlugin(qutoutiao_spec())
+        spec = qutoutiao_spec()
+        navigation = NavigationController(spec)
+        navigator = QutoutiaoTaskPageNavigator(spec, navigation)
         context = _context(StubActions([]))
 
         with patch.object(
-            QutoutiaoPlugin,
-            "_recover_navigation_ad",
+            QutoutiaoTaskPageNavigator,
+            "_recover_ad",
             side_effect=[False, True],
         ) as recover_ad, patch.object(
             NavigationController,
             "go_task_page",
             side_effect=[False, True],
         ) as go_task_page:
-            self.assertTrue(plugin._go_task_page(context))
+            self.assertTrue(navigator(context))
 
         self.assertEqual(2, recover_ad.call_count)
         self.assertEqual(2, go_task_page.call_count)
@@ -349,6 +394,13 @@ class NavigationEfficiencyTest(unittest.TestCase):
 
         self.assertEqual("立即签到领", ocr.query)
         self.assertEqual(0.45, ocr.min_confidence)
+
+    def test_douyin_duration_reward_accepts_observed_popup_title(self):
+        target_spec = douyin_spec().duration_reward.success_target
+        queries = {locator.query for locator in target_spec.locators}
+
+        self.assertIn("开宝箱奖励已到账", queries)
+        self.assertIn("获得开宝箱奖励", queries)
 
     def test_kuaishou_navigation_uses_instrumentation_tree(self):
         targets = (
@@ -394,7 +446,7 @@ class NavigationEfficiencyTest(unittest.TestCase):
             ]
         )
 
-        outcome = self.plugin._browse_video(_context(actions), self.spec.video)
+        outcome = self.video.run(_context(actions))
 
         self.assertEqual(WorkflowStatus.SUCCESS, outcome.status)
         self.assertEqual(0, outcome.outputs["normal"])
@@ -414,8 +466,8 @@ class NavigationEfficiencyTest(unittest.TestCase):
             True if key == "treat_unclassified_as_suspected_ad" else original_option(key, default)
         )
 
-        with patch.object(ConfiguredAppPlugin, "_video_interactions") as interactions:
-            outcome = self.plugin._browse_video(context, self.spec.video)
+        with patch.object(VideoContentTask, "_run_interactions") as interactions:
+            outcome = self.video.run(context)
 
         self.assertEqual(WorkflowStatus.SUCCESS, outcome.status)
         self.assertAlmostEqual(1.0, context.timing.elapsed)
@@ -443,8 +495,8 @@ class NavigationEfficiencyTest(unittest.TestCase):
         )
         context = _context(actions)
 
-        with patch.object(ConfiguredAppPlugin, "_video_interactions") as interactions:
-            outcome = self.plugin._browse_video(context, self.spec.video)
+        with patch.object(VideoContentTask, "_run_interactions") as interactions:
+            outcome = self.video.run(context)
 
         self.assertEqual(WorkflowStatus.SUCCESS, outcome.status)
         self.assertEqual(1, outcome.outputs["normal"])
@@ -462,8 +514,8 @@ class NavigationEfficiencyTest(unittest.TestCase):
         context = _context(actions)
         context.random.random = lambda: 0.1
 
-        with patch.object(ConfiguredAppPlugin, "_video_interactions"):
-            outcome = self.plugin._browse_video(context, self.spec.video)
+        with patch.object(VideoContentTask, "_run_interactions"):
+            outcome = self.video.run(context)
 
         self.assertEqual(WorkflowStatus.SUCCESS, outcome.status)
         self.assertGreaterEqual(context.timing.elapsed, 25.0)
@@ -479,8 +531,8 @@ class NavigationEfficiencyTest(unittest.TestCase):
         context = _context(actions)
         context.random.random = lambda: 0.0
 
-        with patch.object(ConfiguredAppPlugin, "_video_interactions") as interactions:
-            outcome = self.plugin._browse_video(context, self.spec.video)
+        with patch.object(VideoContentTask, "_run_interactions") as interactions:
+            outcome = self.video.run(context)
 
         self.assertEqual(WorkflowStatus.SUCCESS, outcome.status)
         self.assertGreaterEqual(context.timing.elapsed, 3.0)
@@ -496,8 +548,8 @@ class NavigationEfficiencyTest(unittest.TestCase):
         )
         context = _context(actions)
 
-        with patch.object(ConfiguredAppPlugin, "_video_interactions") as interactions:
-            outcome = self.plugin._browse_video(context, self.spec.video)
+        with patch.object(VideoContentTask, "_run_interactions") as interactions:
+            outcome = self.video.run(context)
 
         self.assertEqual(WorkflowStatus.SUCCESS, outcome.status)
         self.assertEqual(0, outcome.outputs["normal"])
@@ -517,8 +569,8 @@ class NavigationEfficiencyTest(unittest.TestCase):
             visual_match=visual_ad.target_id,
         )
 
-        with patch.object(ConfiguredAppPlugin, "_video_interactions") as interactions:
-            outcome = self.plugin._browse_video(_context(actions), self.spec.video)
+        with patch.object(VideoContentTask, "_run_interactions") as interactions:
+            outcome = self.video.run(_context(actions))
 
         self.assertEqual(WorkflowStatus.SUCCESS, outcome.status)
         self.assertEqual(0, outcome.outputs["normal"])
@@ -547,11 +599,11 @@ class NavigationEfficiencyTest(unittest.TestCase):
                 )
 
         context.reach_safe_point = pause_once
-        with patch.object(ConfiguredAppPlugin, "_video_interactions") as interactions:
+        with patch.object(VideoContentTask, "_run_interactions") as interactions:
             with self.assertRaises(WorkflowYield):
-                self.plugin._browse_video(context, self.spec.video)
+                self.video.run(context)
             context.reach_safe_point = lambda checkpoint, **data: None
-            outcome = self.plugin._browse_video(context, self.spec.video)
+            outcome = self.video.run(context)
 
         self.assertEqual(WorkflowStatus.SUCCESS, outcome.status)
         self.assertEqual(2, outcome.outputs["requested"])

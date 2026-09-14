@@ -12,7 +12,7 @@
 - 当前只听书，不执行签到、余额、时段奖励和广告任务。
 - 音频会话时长和检查间隔由配置控制，不做高频 UI 解析。
 - 低频发现应用离开前台后才回首页；App 已自动续播时直接继续，否则点击恢复播放。
-- 冷启动后播放条可能晚于首页出现，仅在首次缺失时由本 App 插件短暂重试一次。
+- 冷启动后播放条可能晚于首页出现，仅在首次缺失时由本 App 播放策略短暂重试一次。
 - WelComeActivity 是已知过渡页，允许有限等待；恢复失败会记录当时前台包名和 Activity。
 
 页面与状态标记：
@@ -28,12 +28,16 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from hym.apps.specs import AppSpec, AudioContentSpec, NavigationSpec
-from hym.apps.plugin import ConfiguredAppPlugin
+from hym.apps.plugin import ComposedAppPlugin, create_daily_plugin
 from hym.apps.targets import id_locator, query_locator, target
 from hym.core.models import AppIdentity, UiTreeSource
 from hym.core.pages import ObservationProfile, PageSpec
+from hym.runtime.audio import AudioContentTask, AudioPlayback, DefaultAudioPlayback
 from hym.runtime.context import AppContext
+from hym.runtime.navigation import NavigationController
 
 
 def ximalaya_spec() -> AppSpec:
@@ -118,11 +122,14 @@ def ximalaya_spec() -> AppSpec:
     )
 
 
-class XimalayaPlugin(ConfiguredAppPlugin):
-    """处理喜马拉雅冷启动后播放条稍晚出现的情况。"""
+@dataclass(frozen=True, slots=True)
+class XimalayaPlayback:
+    """喜马拉雅冷启动后允许播放控件短暂延迟。"""
 
-    def _ensure_audio_playing(self, context: AppContext, spec: AudioContentSpec) -> bool:
-        if super()._ensure_audio_playing(context, spec):
+    fallback: AudioPlayback
+
+    def ensure_playing(self, context: AppContext, spec: AudioContentSpec) -> bool:
+        if self.fallback.ensure_playing(context, spec):
             return True
         context.emit(
             "content.audio.controls.waiting",
@@ -133,10 +140,25 @@ class XimalayaPlugin(ConfiguredAppPlugin):
             status="waiting",
         )
         context.timing.operation_delay()
-        return super()._ensure_audio_playing(context, spec)
+        return self.fallback.ensure_playing(context, spec)
 
 
-def create_plugin() -> ConfiguredAppPlugin:
-    """喜马拉雅插件入口；需要独有任务时在本文件替换为专用插件子类。"""
+def create_plugin() -> ComposedAppPlugin:
+    """喜马拉雅只组合音频会话与专用播放入口策略。"""
 
-    return XimalayaPlugin(ximalaya_spec())
+    spec = ximalaya_spec()
+    navigation = NavigationController(spec)
+    audio = spec.audio
+    if audio is None:
+        raise ValueError("喜马拉雅缺少音频内容规格")
+    content = AudioContentTask(
+        spec.identity,
+        audio,
+        navigation,
+        XimalayaPlayback(DefaultAudioPlayback()),
+    )
+    return create_daily_plugin(
+        spec,
+        navigation=navigation,
+        content_handler=content.run,
+    )

@@ -3,10 +3,9 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 from hym.apps.catalog import douyin_spec, kuaishou_spec, qutoutiao_spec, ximalaya_spec
-from hym.apps.plugin import ConfiguredAppPlugin
+from hym.apps.plugin import create_daily_plugin
 from hym.core.config import AppRunSettings, BehaviorSettings
 from hym.core.events import InMemoryEventSink
 from hym.core.models import (
@@ -29,6 +28,7 @@ from hym.runtime.actions import ActionController
 from hym.runtime.behavior import BehaviorTiming
 from hym.runtime.context import AppContext, DailyActionStatus
 from hym.runtime.lease import DeviceBusyError, DeviceLease
+from hym.runtime.rewards import CheckInTask
 from hym.runtime.workflow import StepOutcome
 from hym.testing import DeterministicRandom, FakeClock, InMemoryStateStore
 
@@ -196,8 +196,9 @@ class RuntimeStateTest(unittest.TestCase):
 
     def test_uncertain_check_in_is_not_clicked_twice(self):
         context, _ = create_actions(StubSession())
-        plugin = ConfiguredAppPlugin(kuaishou_spec())
-        action_id = plugin.spec.check_in.stages[0].action_targets[0].target_id
+        spec = kuaishou_spec()
+        task = CheckInTask(spec, lambda _: True)
+        action_id = spec.check_in.stages[0].action_targets[0].target_id
 
         class CheckInActions:
             def __init__(self):
@@ -227,9 +228,8 @@ class RuntimeStateTest(unittest.TestCase):
                 return True
 
         context.actions = CheckInActions()
-        with patch.object(ConfiguredAppPlugin, "_go_task_page", return_value=True):
-            first = plugin._check_in(context)
-            second = plugin._check_in(context)
+        first = task.run(context)
+        second = task.run(context)
 
         self.assertEqual("retryable_failure", first.status.value)
         self.assertEqual("retryable_failure", second.status.value)
@@ -238,9 +238,10 @@ class RuntimeStateTest(unittest.TestCase):
 
     def test_check_in_dynamically_advances_multiple_stages(self):
         context, _ = create_actions(StubSession())
-        plugin = ConfiguredAppPlugin(douyin_spec())
-        open_stage, _, confirm_stage = plugin.spec.check_in.stages
-        success = plugin.spec.check_in.success_targets[0]
+        spec = douyin_spec()
+        task = CheckInTask(spec, lambda _: True)
+        open_stage, _, confirm_stage = spec.check_in.stages
+        success = spec.check_in.success_targets[0]
 
         class MultiStageActions:
             def __init__(self):
@@ -277,8 +278,7 @@ class RuntimeStateTest(unittest.TestCase):
                 return True
 
         context.actions = MultiStageActions()
-        with patch.object(ConfiguredAppPlugin, "_go_task_page", return_value=True):
-            outcome = plugin._check_in(context)
+        outcome = task.run(context)
 
         self.assertEqual("success", outcome.status.value)
         self.assertEqual(
@@ -289,9 +289,10 @@ class RuntimeStateTest(unittest.TestCase):
 
     def test_check_in_action_takes_priority_over_passive_success(self):
         context, _ = create_actions(StubSession())
-        plugin = ConfiguredAppPlugin(qutoutiao_spec())
-        action = plugin.spec.check_in.stages[0].action_targets[0]
-        passive = plugin.spec.check_in.passive_success_targets[0]
+        spec = qutoutiao_spec()
+        task = CheckInTask(spec, lambda _: True)
+        action = spec.check_in.stages[0].action_targets[0]
+        passive = spec.check_in.passive_success_targets[0]
 
         class PassiveSuccessActions:
             def __init__(self):
@@ -322,8 +323,7 @@ class RuntimeStateTest(unittest.TestCase):
                 return True
 
         context.actions = PassiveSuccessActions()
-        with patch.object(ConfiguredAppPlugin, "_go_task_page", return_value=True):
-            outcome = plugin._check_in(context)
+        outcome = task.run(context)
 
         self.assertEqual("success", outcome.status.value)
         self.assertEqual([action.target_id], context.actions.tapped)
@@ -333,14 +333,16 @@ class ExtensibilityTest(unittest.TestCase):
     def test_content_handler_can_be_replaced_without_changing_workflow(self):
         called = []
 
-        def handler(context, spec):
-            called.append(spec.kind)
+        def handler(context):
+            called.append("audio")
             return StepOutcome.success("自定义策略完成")
 
-        plugin = ConfiguredAppPlugin(ximalaya_spec(), content_handlers={"audio": handler})
+        plugin = create_daily_plugin(ximalaya_spec(), content_handler=handler)
         context = SimpleNamespace(option=lambda key, default: default)
+        definition = plugin.build_workflow(context)
+        content_step = next(step for step in definition.steps if step.step_id == "浏览内容")
 
-        outcome = plugin._browse_content(context)
+        outcome = content_step.handler(context)
 
         self.assertEqual("success", outcome.status.value)
         self.assertEqual(["audio"], called)

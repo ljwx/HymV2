@@ -14,15 +14,16 @@
 - “去签到”和旧版“进度条”只负责打开下一层，不算领取；“主动签到/立即签到领”才是提交动作。
 - 命中“已签到N天”或“打开签到提醒按钮”才确认完成。提交后状态不明时当天不重复领取。
 - 余额每天只成功记录一次。当前节点只适合截图留证，尚未稳定解析出余额文字。
-- 时段奖励匹配“开宝箱得金币”，以“开宝箱奖励已到账”为成功标记，可继续看奖励广告。
+- 时段奖励匹配“开宝箱得金币”，兼容到账提示和“获得开宝箱奖励”弹窗，可继续看奖励广告。
 - 刷视频时先分类广告、长视频和普通视频；明确广告只短暂停留且禁止互动。
-- 当前普通视频标记覆盖不足，未分类内容按保守时长浏览且不互动，不直接当成疑似广告。
+- 当前普通视频标记覆盖不足，未分类内容按普通观看节奏浏览且不互动，不直接当成疑似广告。
 - 普通视频约 8% 快速划过、25% 尝试完整观看，其余按常规时长观看；所有比例和时长可独立配置。
 - 普通/长视频可按配置概率关注、点赞、查看评论、进入作者主页并浏览随机作品。
 - 明确广告仍快速划走；后续只有找到可靠的新广告信号，才补进广告标记组。
 
 页面与状态标记：
 - 首页：root_view + user_avatar/viewpager，且不能出现任务页标记；首页标签：“首页”。
+- 已确认处于视频流时不重复点击“首页”，避免在单视频和视频列表之间切换。
 - 任务入口：描述“福袋”，兼容图片和底栏结构；任务页：“每天都能领金币”/
   “已签到N天”/标题“赚钱任务”。
 - 视频广告：“当前直播间可用”/“广告”/“查看详情”/“立即下载”。
@@ -36,7 +37,7 @@
 from __future__ import annotations
 
 from hym.apps.app_specs.common import FRAME, GROUP, IMAGE, RECYCLER, text_target
-from hym.apps.plugin import ConfiguredAppPlugin
+from hym.apps.plugin import ComposedAppPlugin, create_daily_plugin
 from hym.apps.specs import (
     AdSpec,
     AppSpec,
@@ -131,6 +132,7 @@ def douyin_spec() -> AppSpec:
             home_tab,
             task_entry,
             task_marker,
+            reselect_home_tab=False,
             home_page=PageSpec(
                 "douyin.home",
                 package_name,
@@ -231,7 +233,13 @@ def douyin_spec() -> AppSpec:
                 "抖音时段奖励",
                 desc_locator("开宝箱描述", "开宝箱得金币"),
             ),
-            success_target=text_target("抖音奖励到账", "开宝箱奖励已到账"),
+            success_target=target(
+                "抖音奖励到账",
+                text_locator("到账提示文本", "开宝箱奖励已到账"),
+                text_locator("奖励弹窗标题", "获得开宝箱奖励"),
+                ocr_locator("到账提示OCR", "开宝箱奖励已到账", mode="exact"),
+                ocr_locator("奖励弹窗标题OCR", "获得开宝箱奖励", mode="contains"),
+            ),
             ad_target=target(
                 "抖音奖励广告",
                 image_locator("奖励广告图片", "douyin/go_video_ad_icon.png"),
@@ -311,7 +319,7 @@ def douyin_spec() -> AppSpec:
     )
 
 
-def create_plugin() -> ConfiguredAppPlugin:
-    """抖音插件入口；需要独有任务时在本文件替换为专用插件子类。"""
+def create_plugin() -> ComposedAppPlugin:
+    """抖音插件入口；当前组合标准奖励任务和视频内容任务。"""
 
-    return ConfiguredAppPlugin(douyin_spec())
+    return create_daily_plugin(douyin_spec())

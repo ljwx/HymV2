@@ -93,6 +93,8 @@
 
 当前快手的 `milano_player_seekbar` 只暴露控件位置和尺寸，没有进度值、最大值或总时长。系统因此不会声称精确看完，而是按概率执行较长的“完整观看尝试”。当前普通视频约 8% 停留 `3~7` 秒、67% 停留 `10~30` 秒、25% 尝试停留 `25~65` 秒；明确广告停留 `0.5~2.5` 秒，疑似广告停留 `1~4` 秒。日志中的 `classification_kind`、`classification_reason`、`watch_mode`、`planned_duration_seconds`、`classification_seconds` 和 `post_classification_wait_seconds` 可以还原每条视频为何在该时间切换。未来某个版本若暴露可靠结束标记，再按“结果优先、超时兜底”接入，不使用高频截图猜进度。
 
+每条视频从滑动开始计时。先按对应范围的正态分布生成计划时长，再计算“计划时长减去分类耗时”；同时保证分类完成后至少继续停留配置的最短时间，两者取较大值。抖音当前多数内容因缺少稳定普通视频标记而使用未分类策略：按普通观看节奏计划 `10~30` 秒、中心值 `18` 秒，分类完成后至少再停留 `5` 秒，并且默认不互动；明确广告仍使用 `0.5~2.5` 秒。修改抖音 `unclassified_duration_*` 即可单独调整这类视频，不影响快手。
+
 ## 记录新流程
 
 发现新的奖励入口或页面分支时，可以先用手动流程记录器保存事实，不必先写代码：
@@ -150,8 +152,8 @@ rg 'workflow.finished|workflow.suspended|runtime.interruption|diagnostic.thresho
 2. 在 `hym/apps/registry.py` 注册插件工厂。
 3. 在配置文件的设备下加入 `app_id` 和业务参数。
 
-视频、新闻和音频处理器由 `ConfiguredAppPlugin` 按类型注册。新的内容形态需要新增内容规格类型和处理器，但不需要修改设备连接、事件、诊断或多进程代码。
+默认视频、新闻和音频任务由 `create_daily_plugin()` 按内容规格组合。某个 App 的单项流程不同，可以在该 App 文件创建自己的任务并替换 `DailyTaskSet` 对应字段；整体流程不同则使用 `create_custom_plugin()` 注入独立工作流，不需要修改设备连接、事件、诊断或多进程代码。
 
-已有 App 的 ID、文案、页面分支和独有任务如何维护，见 [`hym/apps/app_specs/README.md`](../hym/apps/app_specs/README.md)。每个 App 文件底部拥有自己的 `create_plugin()`，增加 App 独有步骤时不需要修改公共执行器或注册表。
+已有 App 的 ID、文案、页面分支和独有任务如何维护，见 [`hym/apps/app_specs/README.md`](../hym/apps/app_specs/README.md)。每个 App 文件底部拥有自己的 `create_plugin()`；新增 App 只需在注册表增加一次工厂，后续流程变化保持在该 App 文件和配置块内。
 
 App 和页面通过 `ObservationProfile` 选择 `instrumentation` 或 `accessibility`，特殊目标仍可单独覆盖。同一 App 可以按页面混用。OCR、图片和坐标是后备定位策略，不会默认参与每一次页面判断。

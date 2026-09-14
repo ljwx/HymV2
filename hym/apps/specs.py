@@ -28,6 +28,7 @@ class NavigationSpec:
     task_dismiss: tuple[TargetSpec, ...] = ()
     page_wait_seconds: float = 4.0
     home_attempts: int = 5
+    reselect_home_tab: bool = True
     transient_activity_patterns: tuple[str, ...] = ()
     home_page: PageSpec | None = None
     task_page: PageSpec | None = None
@@ -219,7 +220,7 @@ class AppSpec:
     balance: BalanceSpec | None
     ad: AdSpec | None
     duration_reward: DurationRewardSpec | None
-    content: ContentSpec
+    content: ContentSpec | None
     ad_entry: TargetSpec | None = None
     observation_profile: ObservationProfile = field(default_factory=ObservationProfile)
     metadata: Mapping[str, Any] = field(default_factory=dict)
@@ -227,10 +228,6 @@ class AppSpec:
     @property
     def content_kind(self) -> str:
         return str(getattr(self.content, "kind", ""))
-
-    def __post_init__(self) -> None:
-        if not self.content_kind:
-            raise ValueError("应用内容配置必须声明 kind")
 
     @property
     def video(self) -> VideoContentSpec | None:

@@ -16,7 +16,7 @@
 - 余额每天只成功记录一次，读取任务页顶部数字；失败不写当天完成状态。
 - 随机打开文章，确认详情页后滚动；看到底部、点赞、查看评论都按配置概率执行，不发表评论。
 - 广告失败不阻断文章流程，公共恢复逻辑会先返回首页，必要时重启应用。
-- 导航途中自动拉起已知广告 Activity 时，由本 App 插件完成一轮广告后再重试任务页。
+- 导航途中自动拉起已知广告 Activity 时，由本 App 导航策略完成一轮广告后再重试任务页。
 
 页面与状态标记：
 - 首页标签：“头条”（未选中）或“刷新”（已选中），兼容旧版“首页”；同时必须有文章列表。
@@ -33,8 +33,10 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from hym.apps.app_specs.common import FRAME, IMAGE, TEXT, text_target
-from hym.apps.plugin import ConfiguredAppPlugin
+from hym.apps.plugin import ComposedAppPlugin, create_daily_plugin
 from hym.apps.specs import (
     AdSpec,
     AppSpec,
@@ -60,6 +62,7 @@ from hym.core.pages import ObservationProfile, PageSpec
 from hym.core.targets import LocatorKind
 from hym.runtime.ads import AdStateMachine
 from hym.runtime.context import AppContext
+from hym.runtime.navigation import NavigationController
 
 
 def qutoutiao_spec() -> AppSpec:
@@ -266,24 +269,28 @@ def qutoutiao_spec() -> AppSpec:
     )
 
 
-class QutoutiaoPlugin(ConfiguredAppPlugin):
-    """处理趣头条导航途中自动拉起的奖励广告。"""
+@dataclass(frozen=True, slots=True)
+class QutoutiaoTaskPageNavigator:
+    """在趣头条进入任务页时接管已知奖励广告。"""
 
-    def _go_task_page(self, context: AppContext) -> bool:
+    spec: AppSpec
+    navigation: NavigationController
+
+    def __call__(self, context: AppContext) -> bool:
         recovered_ad = False
         for attempt in range(2):
-            if not recovered_ad and self._recover_navigation_ad(context):
+            if not recovered_ad and self._recover_ad(context):
                 recovered_ad = True
-            if super()._go_task_page(context):
+            if self.navigation.go_task_page(context):
                 return True
-            if not recovered_ad and self._recover_navigation_ad(context):
+            if not recovered_ad and self._recover_ad(context):
                 recovered_ad = True
                 continue
             if attempt == 0:
                 context.timing.operation_delay()
         return False
 
-    def _recover_navigation_ad(self, context: AppContext) -> bool:
+    def _recover_ad(self, context: AppContext) -> bool:
         ad = self.spec.ad
         if ad is None:
             return False
@@ -311,7 +318,13 @@ class QutoutiaoPlugin(ConfiguredAppPlugin):
         return False
 
 
-def create_plugin() -> ConfiguredAppPlugin:
-    """趣头条插件入口；需要独有任务时在本文件替换为专用插件子类。"""
+def create_plugin() -> ComposedAppPlugin:
+    """趣头条组合新闻任务与专用任务页导航。"""
 
-    return QutoutiaoPlugin(qutoutiao_spec())
+    spec = qutoutiao_spec()
+    navigation = NavigationController(spec)
+    return create_daily_plugin(
+        spec,
+        navigation=navigation,
+        task_page_navigator=QutoutiaoTaskPageNavigator(spec, navigation),
+    )

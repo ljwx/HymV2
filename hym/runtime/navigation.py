@@ -132,7 +132,8 @@ class NavigationController:
                 unexpected_activity_count = 0
 
             if page_result.matched and observation is not None:
-                if not select_tab:
+                # 某些 App 重复点击已选中的首页会切换展示模式。
+                if not select_tab or not navigation.reselect_home_tab:
                     return True
                 result = context.actions.resolve_in(navigation.home_tab, observation)
                 if result.found and result.target is not None:

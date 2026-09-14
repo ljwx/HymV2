@@ -40,7 +40,7 @@
 from __future__ import annotations
 
 from hym.apps.app_specs.common import BUTTON, IMAGE, TEXT, text_target
-from hym.apps.plugin import ConfiguredAppPlugin
+from hym.apps.plugin import ComposedAppPlugin, create_daily_plugin
 from hym.apps.specs import (
     AdSpec,
     AppSpec,
@@ -417,7 +417,7 @@ def kuaishou_spec() -> AppSpec:
     )
 
 
-def create_plugin() -> ConfiguredAppPlugin:
-    """快手插件入口；需要独有任务时在本文件替换为专用插件子类。"""
+def create_plugin() -> ComposedAppPlugin:
+    """快手插件入口；当前组合标准奖励任务和视频内容任务。"""
 
-    return ConfiguredAppPlugin(kuaishou_spec())
+    return create_daily_plugin(kuaishou_spec())
