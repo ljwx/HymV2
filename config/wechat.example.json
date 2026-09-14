@@ -1,0 +1,43 @@
+{
+  "runtime_config": "automation.json",
+  "device_id": "",
+  "ocr_engine": "macos_vision",
+  "ocr_language": "zh-Hans",
+  "launch_wait_seconds": 5.0,
+  "page_wait_seconds": 2.0,
+  "root_attempts": 3,
+  "randomize_view_order": true,
+  "stop_app_probability": 0.0,
+  "behavior": {
+    "timing_scale": 1.0,
+    "jitter_ratio": 0.12
+  },
+  "moments": {
+    "enabled": true,
+    "swipes_min": 2,
+    "swipes_center": 3.5,
+    "swipes_max": 5,
+    "swipes_stddev": 0.5,
+    "pause_min_seconds": 2.5,
+    "pause_center_seconds": 4.0,
+    "pause_max_seconds": 6.0,
+    "pause_stddev_seconds": 0.58
+  },
+  "wallet": {
+    "enabled": true,
+    "capture_once_per_day": true
+  },
+  "chat": {
+    "enabled": false,
+    "send": false,
+    "friend_name": "",
+    "message_groups": [
+      ["最近怎么样？", "有空聊聊。"]
+    ],
+    "once_per_day": true,
+    "interval_min_seconds": 1.5,
+    "interval_center_seconds": 2.75,
+    "interval_max_seconds": 4.0,
+    "interval_stddev_seconds": 0.42
+  }
+}

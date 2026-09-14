@@ -80,7 +80,7 @@ class DeviceBase(DeviceRandomConfig):
             self.swipe_up_unlock()
             sleep(1.5)
         else:
-            print("unlock")
+            print("设备已解锁")
 
     def swipe_up_unlock(self):
         screen_size = self.get_screen_size()
@@ -94,10 +94,7 @@ class DeviceBase(DeviceRandomConfig):
         self.dev.swipe((start_x, start_y), (end_x, end_y))
 
     def start_app(self, package_name: str):
-        if self.is_app_exist(package_name):
-            self.dev.start_app(package_name)
-        else:
-            self.dev.start_app(package_name)
+        self.dev.start_app(package_name)
 
     def stop_app(self, package_name: str):
         self.dev.stop_app(package_name)
