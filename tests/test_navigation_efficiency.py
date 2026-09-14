@@ -4,12 +4,15 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from hym.apps.catalog import kuaishou_spec, ximalaya_spec
+from hym.apps.app_specs.qutoutiao import QutoutiaoPlugin
+from hym.apps.app_specs.ximalaya import XimalayaPlugin
+from hym.apps.catalog import douyin_spec, kuaishou_spec, qutoutiao_spec, ximalaya_spec
 from hym.apps.plugin import ConfiguredAppPlugin
 from hym.core.models import ActivityInfo, Observation, Point, SystemKey, WorkflowStatus
 from hym.core.pages import PageMatchResult, PageMatchStatus
 from hym.core.targets import LocatorKind, ResolveResult, ResolveStatus, ResolvedTarget
 from hym.runtime.interruption import InterruptionKind, InterruptionRequest, WorkflowYield
+from hym.runtime.navigation import NavigationController
 
 
 def _found(target, observation):
@@ -306,6 +309,46 @@ class NavigationEfficiencyTest(unittest.TestCase):
         self.assertEqual(1, actions.observation_count)
         self.assertEqual([audio.resume_target.target_id], actions.tapped)
         self.assertEqual(1, context.timing.operation_delays)
+
+    def test_ximalaya_retries_once_when_playbar_loads_after_home(self):
+        spec = ximalaya_spec()
+        audio = spec.content
+        actions = StubActions(
+            [set(), {audio.session_marker.target_id, audio.resume_target.target_id}],
+            packages=[spec.identity.package_name, spec.identity.package_name],
+        )
+        context = _context(actions)
+
+        self.assertTrue(XimalayaPlugin(spec)._ensure_audio_playing(context, audio))
+
+        self.assertEqual(2, actions.observation_count)
+        self.assertEqual([audio.resume_target.target_id], actions.tapped)
+        self.assertEqual(2, context.timing.operation_delays)
+
+    def test_qutoutiao_retries_task_navigation_after_handling_ad(self):
+        plugin = QutoutiaoPlugin(qutoutiao_spec())
+        context = _context(StubActions([]))
+
+        with patch.object(
+            QutoutiaoPlugin,
+            "_recover_navigation_ad",
+            side_effect=[False, True],
+        ) as recover_ad, patch.object(
+            NavigationController,
+            "go_task_page",
+            side_effect=[False, True],
+        ) as go_task_page:
+            self.assertTrue(plugin._go_task_page(context))
+
+        self.assertEqual(2, recover_ad.call_count)
+        self.assertEqual(2, go_task_page.call_count)
+
+    def test_douyin_sign_in_ocr_accepts_observed_confidence(self):
+        target_spec = douyin_spec().check_in.stages[2].action_targets[0]
+        ocr = next(locator for locator in target_spec.locators if locator.kind is LocatorKind.OCR_TEXT)
+
+        self.assertEqual("立即签到领", ocr.query)
+        self.assertEqual(0.45, ocr.min_confidence)
 
     def test_kuaishou_navigation_uses_instrumentation_tree(self):
         targets = (

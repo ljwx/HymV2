@@ -16,6 +16,7 @@
 - 余额每天只成功记录一次，读取任务页顶部数字；失败不写当天完成状态。
 - 随机打开文章，确认详情页后滚动；看到底部、点赞、查看评论都按配置概率执行，不发表评论。
 - 广告失败不阻断文章流程，公共恢复逻辑会先返回首页，必要时重启应用。
+- 导航途中自动拉起已知广告 Activity 时，由本 App 插件完成一轮广告后再重试任务页。
 
 页面与状态标记：
 - 首页标签：“头条”（未选中）或“刷新”（已选中），兼容旧版“首页”；同时必须有文章列表。
@@ -56,6 +57,9 @@ from hym.apps.targets import (
 )
 from hym.core.models import AppIdentity, Rect, UiTreeSource
 from hym.core.pages import ObservationProfile, PageSpec
+from hym.core.targets import LocatorKind
+from hym.runtime.ads import AdStateMachine
+from hym.runtime.context import AppContext
 
 
 def qutoutiao_spec() -> AppSpec:
@@ -262,7 +266,52 @@ def qutoutiao_spec() -> AppSpec:
     )
 
 
+class QutoutiaoPlugin(ConfiguredAppPlugin):
+    """处理趣头条导航途中自动拉起的奖励广告。"""
+
+    def _go_task_page(self, context: AppContext) -> bool:
+        recovered_ad = False
+        for attempt in range(2):
+            if not recovered_ad and self._recover_navigation_ad(context):
+                recovered_ad = True
+            if super()._go_task_page(context):
+                return True
+            if not recovered_ad and self._recover_navigation_ad(context):
+                recovered_ad = True
+                continue
+            if attempt == 0:
+                context.timing.operation_delay()
+        return False
+
+    def _recover_navigation_ad(self, context: AppContext) -> bool:
+        ad = self.spec.ad
+        if ad is None:
+            return False
+        observation = context.actions.observe(
+            include_ui_tree=False,
+            include_screenshot=False,
+        )
+        if observation is None:
+            return False
+        for target_spec in ad.start_markers:
+            if not all(locator.kind is LocatorKind.ACTIVITY for locator in target_spec.locators):
+                continue
+            if not context.actions.resolve_in(target_spec, observation).found:
+                continue
+            context.emit(
+                "navigation.blocking_ad.detected",
+                "导航广告接管",
+                "检测到导航途中遗留的奖励广告，完成后再进入任务页",
+                workflow_id="daily",
+                status="recovering",
+                data={"activity_name": observation.activity.activity_name},
+            )
+            AdStateMachine().run(context, ad)
+            return True
+        return False
+
+
 def create_plugin() -> ConfiguredAppPlugin:
     """趣头条插件入口；需要独有任务时在本文件替换为专用插件子类。"""
 
-    return ConfiguredAppPlugin(qutoutiao_spec())
+    return QutoutiaoPlugin(qutoutiao_spec())

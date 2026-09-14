@@ -198,7 +198,7 @@ def douyin_spec() -> AppSpec:
                                 "立即签到领",
                                 mode="contains",
                                 region=Rect(0.15, 0.75, 0.90, 0.95),
-                                confidence=0.65,
+                                confidence=0.45,
                             ),
                         ),
                     ),
