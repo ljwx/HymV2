@@ -24,7 +24,7 @@
 - 未开启疑似广告策略的 App 才按未分类视频保守浏览，默认不互动。
 
 页面与状态标记：
-- 首页：bottom_bar_container；首页标签：“首页”；任务入口：“去赚钱”；任务页：“任务中心”。
+- 首页：同时命中 bottom_bar_container 和“首页”；任务入口：“去赚钱”；任务页：“任务中心”。
 - 启动关闭：close_btn；邀请弹窗：“邀请2个新用户必得”；返回拦截：“离开”。
 - 视频流：follow_avatar_view，兼容直播预览 layout_root_hot_live_play。
 - 广告视频：ad_download_progress / slide_play_right_link_icon / ad_card_container_root /
@@ -237,9 +237,11 @@ def kuaishou_spec() -> AppSpec:
             home_page=PageSpec(
                 "kuaishou.home",
                 package_name,
-                (home_marker,),
+                # 作者主页也会保留底栏容器，必须同时看到“首页”标签才算首页。
+                (home_marker, home_tab),
                 forbidden_markers=(task_marker,),
                 activity_patterns=(r"HomeActivity$",),
+                minimum_markers=2,
                 observation_profile=observation_profile,
             ),
             task_page=PageSpec(
@@ -272,6 +274,7 @@ def kuaishou_spec() -> AppSpec:
                             metadata={"ui_tree_source": tree_source},
                         ),
                     ),
+                    wait_seconds=5.0,
                 ),
             ),
             success_targets=(
@@ -319,6 +322,7 @@ def kuaishou_spec() -> AppSpec:
             ),
             screenshot_only=True,
             close_with_back=True,
+            enter_wait_seconds=4.0,
         ),
         ad=ad,
         duration_reward=DurationRewardSpec(
@@ -340,6 +344,7 @@ def kuaishou_spec() -> AppSpec:
                 metadata={"ui_tree_source": tree_source},
             ),
             close_target=duration_close,
+            result_wait_seconds=4.0,
         ),
 
         # 新广告特征追加到 ad_markers，不能混入 normal_markers
@@ -408,10 +413,19 @@ def kuaishou_spec() -> AppSpec:
                 follow_target=target("快手关注", id_locator("关注ID", prefix + "follow_button")),
             ),
         ),
-        ad_entry=text_target(
+        ad_entry=target(
             "快手广告任务入口",
-            "看广告得金币",
-            ui_tree_source=tree_source,
+            # “看广告得金币”是任务标题，真机上的可点击按钮是“领福利”。
+            text_locator("广告福利按钮文本", "领福利", region=Rect(0.65, 0.20, 1.0, 0.95)),
+            text_locator("广告任务文本", "看广告得金币", priority=21),
+            ocr_locator(
+                "广告福利按钮OCR",
+                "领福利",
+                mode="exact",
+                region=Rect(0.65, 0.20, 1.0, 0.95),
+                priority=80,
+            ),
+            metadata={"ui_tree_source": tree_source},
         ),
         observation_profile=observation_profile,
     )

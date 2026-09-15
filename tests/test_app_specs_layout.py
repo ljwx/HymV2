@@ -126,6 +126,23 @@ class AppSpecLayoutTest(unittest.TestCase):
             create_default_registry().app_ids(),
         )
 
+    def test_kuaishou_home_rejects_pages_that_only_keep_bottom_bar(self):
+        spec = kuaishou_spec()
+        home_page = spec.navigation.home_page
+
+        self.assertIsNotNone(home_page)
+        self.assertEqual(2, home_page.minimum_markers)
+        self.assertEqual(
+            ("快手首页标记", "快手首页标签"),
+            tuple(marker.target_id for marker in home_page.markers),
+        )
+
+    def test_kuaishou_ad_entry_prefers_the_action_button(self):
+        spec = kuaishou_spec()
+
+        self.assertEqual("广告福利按钮文本", spec.ad_entry.locators[0].strategy_id)
+        self.assertEqual("领福利", spec.ad_entry.locators[0].query)
+
     def test_registry_rejects_cross_app_target_id_collision(self):
         first_spec = kuaishou_spec()
         second_spec = replace(

@@ -252,7 +252,7 @@ class NavigationEfficiencyTest(unittest.TestCase):
         self.assertEqual([spec.navigation.home_tab.target_id], actions.tapped)
         self.assertEqual([], actions.pressed)
 
-    def test_missing_home_tab_is_reobserved_before_recovery(self):
+    def test_bottom_bar_without_home_tab_is_recovered_with_back(self):
         actions = StubActions(
             [
                 {self.spec.navigation.home_marker.target_id},
@@ -264,14 +264,17 @@ class NavigationEfficiencyTest(unittest.TestCase):
 
         self.assertEqual(2, actions.observation_count)
         self.assertEqual([self.spec.navigation.home_tab.target_id], actions.tapped)
-        self.assertEqual([], actions.pressed)
+        self.assertEqual([SystemKey.BACK], actions.pressed)
 
     def test_popup_is_checked_only_after_home_is_missing(self):
         close_target = self.spec.navigation.home_intercepts[0].close_target
         actions = StubActions(
             [
                 {close_target.target_id},
-                {self.spec.navigation.home_marker.target_id},
+                {
+                    self.spec.navigation.home_marker.target_id,
+                    self.spec.navigation.home_tab.target_id,
+                },
             ]
         )
 
@@ -297,7 +300,13 @@ class NavigationEfficiencyTest(unittest.TestCase):
 
     def test_home_relaunches_once_when_foreground_left_app(self):
         actions = StubActions(
-            [set(), {self.spec.navigation.home_marker.target_id}],
+            [
+                set(),
+                {
+                    self.spec.navigation.home_marker.target_id,
+                    self.spec.navigation.home_tab.target_id,
+                },
+            ],
             packages=["com.miui.home", "com.kuaishou.nebula"],
         )
         context = _context(actions)

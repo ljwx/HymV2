@@ -88,6 +88,11 @@ class BalanceSpec:
     screenshot_only: bool = False
     close_with_back: bool = False
     region: Rect | None = None
+    enter_wait_seconds: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.enter_wait_seconds is not None and self.enter_wait_seconds < 0:
+            raise ValueError("余额页面等待时间不能小于零")
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,6 +171,11 @@ class DurationRewardSpec:
     success_target: TargetSpec | None = None
     ad_target: TargetSpec | None = None
     close_target: TargetSpec | None = None
+    result_wait_seconds: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.result_wait_seconds is not None and self.result_wait_seconds < 0:
+            raise ValueError("时段奖励结果等待时间不能小于零")
 
 
 @dataclass(frozen=True, slots=True)

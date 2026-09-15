@@ -221,7 +221,10 @@ class BalanceTask:
         if spec.enter_target is not None:
             if not context.actions.tap_target(spec.enter_target, timeout=2.0):
                 return StepOutcome.failure("没有找到余额页面入口")
-            context.timing.operation_delay()
+            if spec.enter_wait_seconds is None:
+                context.timing.operation_delay()
+            else:
+                context.timing.wait(spec.enter_wait_seconds)
         if spec.page_marker is not None and not context.actions.exists(
             spec.page_marker,
             timeout=3.0,
@@ -275,11 +278,17 @@ class DurationRewardTask:
             return StepOutcome.failure("领取时段奖励时无法进入任务页")
         if not context.actions.tap_target(spec.reward_target, timeout=2.0):
             return StepOutcome.skipped("当前没有可领取的时段奖励")
-        context.timing.operation_delay()
+        if spec.result_wait_seconds is None:
+            context.timing.operation_delay()
+        else:
+            context.timing.wait(spec.result_wait_seconds)
         if spec.success_target is not None and not context.actions.exists(
             spec.success_target,
             timeout=5.0,
         ):
+            # 结果识别失败也要清理弹窗，避免遮挡后续独立任务。
+            if spec.close_target is not None:
+                context.actions.tap_target(spec.close_target, timeout=1.0)
             return StepOutcome.failure("已点击时段奖励，但没有识别到到账提示")
         ad_outcome: StepOutcome | None = None
         if spec.ad_target is not None and self.app_spec.ad is not None:
