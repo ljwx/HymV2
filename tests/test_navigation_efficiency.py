@@ -40,6 +40,7 @@ class StubActions:
         self.tapped = []
         self.pressed = []
         self.swipe_count = 0
+        self.resolve_many_calls = []
 
     def observe(self, *, include_ui_tree, include_screenshot):
         self.current = self.pages.pop(0)
@@ -117,6 +118,7 @@ class StubActions:
     def resolve_many(self, *args, **kwargs):
         if self.visual_match is None:
             raise AssertionError("没有视觉目标时不应重复解析 UI")
+        self.resolve_many_calls.append(kwargs)
         target = next(item for item in args[0] if item.target_id == self.visual_match)
         observation = Observation(
             "device-1",
@@ -575,6 +577,7 @@ class NavigationEfficiencyTest(unittest.TestCase):
         self.assertEqual(WorkflowStatus.SUCCESS, outcome.status)
         self.assertEqual(0, outcome.outputs["normal"])
         interactions.assert_not_called()
+        self.assertFalse(actions.resolve_many_calls[0]["include_ui_tree"])
 
     def test_video_resume_does_not_repeat_completed_item(self):
         normal_marker = self.spec.video.normal_markers[0]

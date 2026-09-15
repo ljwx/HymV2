@@ -78,6 +78,8 @@ class VideoContentClassifier:
                 visual_ad = context.actions.resolve_many(
                     visual_ad_targets,
                     include_screenshot=True,
+                    # 结构定位已使用上一份观察完成，这里只补视觉证据。
+                    include_ui_tree=False,
                     screenshot_max_size=int(context.option("video_ocr_max_size", 960)),
                 )
                 if visual_ad is not None:

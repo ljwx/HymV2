@@ -71,10 +71,15 @@ class ActionController:
         targets: Sequence[TargetSpec],
         *,
         include_screenshot: bool = False,
+        include_ui_tree: bool | None = None,
         screenshot_max_size: int | None = None,
     ) -> tuple[TargetSpec, ResolveResult] | None:
         observation = self.observe(
-            include_ui_tree=_needs_ui_tree(targets),
+            include_ui_tree=(
+                _needs_ui_tree(targets)
+                if include_ui_tree is None
+                else include_ui_tree
+            ),
             include_screenshot=include_screenshot,
             ui_tree_source=_tree_source(targets, self.context.observation_profile.ui_tree_source),
             screenshot_max_size=screenshot_max_size,
