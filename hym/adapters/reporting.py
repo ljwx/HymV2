@@ -40,7 +40,6 @@ class DurableHttpEventSink:
         self._sender = sender or self._send_request
         self._lock = threading.Lock()
         self._last_error = ""
-        self._pending_count = self._line_count()
         self._next_retry_at = 0.0
 
     def emit(self, event: AutomationEvent) -> None:
@@ -56,12 +55,13 @@ class DurableHttpEventSink:
                 file.write(payload)
                 file.write("\n")
                 file.flush()
-            self._pending_count += 1
-            flush_all = event.event_type == "runtime.cycle.finished"
-            should_flush = flush_all or self._pending_count >= self.settings.batch_size
-            if should_flush and time.monotonic() >= self._next_retry_at:
+            # 任务执行中只追加本地队列，避免网络请求打断操作节奏。
+            if (
+                event.event_type == "runtime.cycle.finished"
+                and time.monotonic() >= self._next_retry_at
+            ):
                 try:
-                    self._flush(flush_all=flush_all)
+                    self._flush()
                     self._last_error = ""
                     self._next_retry_at = 0.0
                 except Exception as error:
@@ -75,14 +75,12 @@ class DurableHttpEventSink:
         """供测试和退出钩子显式触发；失败时保留原队列。"""
 
         with self._lock:
-            self._flush(flush_all=True)
+            self._flush()
 
-    def _flush(self, *, flush_all: bool) -> None:
+    def _flush(self) -> None:
         while True:
             lines = self._read_lines()
             if not lines:
-                return
-            if not flush_all and len(lines) < self.settings.batch_size:
                 return
             batch_lines = lines[: self.settings.batch_size]
             events = [event for line in batch_lines if (event := json.loads(line)).get("cycle_id")]
@@ -91,8 +89,6 @@ class DurableHttpEventSink:
                 if self.settings.upload_artifacts:
                     self._upload_artifacts(events)
             self._rewrite_lines(lines[len(batch_lines) :])
-            if not flush_all:
-                return
 
     def _upload_events(self, events: list[dict[str, Any]]) -> None:
         request = {
@@ -167,15 +163,10 @@ class DurableHttpEventSink:
             return []
         return [line for line in self.queue_path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
-    def _line_count(self) -> int:
-        return len(self._read_lines())
-
     def _rewrite_lines(self, lines: list[str]) -> None:
         if not lines:
             self.queue_path.unlink(missing_ok=True)
-            self._pending_count = 0
             return
         temporary = self.queue_path.with_suffix(self.queue_path.suffix + ".tmp")
         temporary.write_text("\n".join(lines) + "\n", encoding="utf-8")
         os.replace(temporary, self.queue_path)
-        self._pending_count = len(lines)

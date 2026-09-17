@@ -16,7 +16,7 @@ from hym.apps.plugin import (
     create_daily_task_set,
 )
 from hym.apps.registry import AppRegistry, create_default_registry
-from hym.core.models import AppIdentity
+from hym.core.models import ActionResult, AppIdentity
 from hym.runtime.navigation import NavigationController
 from hym.runtime.workflow import StepDefinition, StepOutcome, WorkflowDefinition
 
@@ -119,6 +119,21 @@ class AppSpecLayoutTest(unittest.TestCase):
             ["启动应用", "处理启动弹窗", "每日签到"],
             [step.step_id for step in plugin.build_workflow(context).steps],
         )
+
+    def test_ximalaya_stops_app_after_audio_task(self):
+        stopped = []
+        context = SimpleNamespace(
+            session=SimpleNamespace(
+                stop_app=lambda app: stopped.append(app) or ActionResult.success("stop_app")
+            ),
+        )
+        steps = create_ximalaya_plugin().build_workflow(context).steps
+
+        self.assertEqual("浏览内容", steps[-2].step_id)
+        self.assertEqual("停止应用", steps[-1].step_id)
+        outcome = steps[-1].handler(context)
+        self.assertEqual("success", outcome.status.value)
+        self.assertEqual("ximalaya", stopped[0].app_id)
 
     def test_default_specs_have_globally_unique_target_ids(self):
         self.assertEqual(

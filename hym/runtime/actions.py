@@ -377,6 +377,7 @@ class ActionController:
                 "locator.fallback.succeeded",
                 "降级定位成功",
                 f"目标 {target.target_id} 使用备用策略定位成功",
+                level=EventLevel.DEBUG,
                 workflow_id=None,
                 status="success",
                 data={

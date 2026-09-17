@@ -31,6 +31,7 @@ ManagerFactory = Callable[[DeviceDescriptor], Any]
 _ACTIVITY_COMPONENT = re.compile(
     r"(?P<package>[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+)/(?P<activity>\.?[A-Za-z0-9_.$]+)"
 )
+_POCO_SERVICE_PACKAGE = "com.netease.open.pocoservice"
 _PIXEL_BOUNDS = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
 _UI_DUMP_PATH = "/sdcard/hym-window.xml"
 
@@ -69,6 +70,7 @@ class AirtestPocoDeviceAdapter:
         self._descriptor = descriptor
         self._manager_factory = manager_factory
         self._manager = manager
+        self._last_activity = ActivityInfo()
 
     @property
     def descriptor(self) -> DeviceDescriptor:
@@ -125,7 +127,11 @@ class AirtestPocoDeviceAdapter:
             return HealthReport(HealthState.DEGRADED, message=str(error))
 
     def start_app(self, app: AppIdentity) -> ActionResult:
-        return self._run_action("start_app", lambda manager: manager.start_app(app.package_name))
+        result = self._run_action("start_app", lambda manager: manager.start_app(app.package_name))
+        if result.succeeded:
+            # 启动后的首次观察可能仍看到 Poco 的 TestActivity，先记住所需前台包名。
+            self._last_activity = ActivityInfo(package_name=app.package_name)
+        return result
 
     def stop_app(self, app: AppIdentity) -> ActionResult:
         return self._run_action("stop_app", lambda manager: manager.stop_app(app.package_name))
@@ -155,6 +161,7 @@ class AirtestPocoDeviceAdapter:
             SystemKey.VOLUME_UP: "VOLUME_UP",
             SystemKey.VOLUME_DOWN: "VOLUME_DOWN",
             SystemKey.POWER: "POWER",
+            SystemKey.SLEEP: "SLEEP",
         }
         return self._run_action("press", lambda manager: manager.dev.keyevent(key_events[key]))
 
@@ -228,11 +235,18 @@ class AirtestPocoDeviceAdapter:
                 output = shell("dumpsys activity activities")
                 parsed = _parse_resumed_activity(output)
                 if parsed is not None:
+                    self._last_activity = parsed
                     return parsed
             except Exception:
                 pass
         package_name, activity_name = self._manager.get_top_activity()
-        return ActivityInfo(package_name=package_name, activity_name=activity_name)
+        current = ActivityInfo(package_name=package_name, activity_name=activity_name)
+        # Poco 采集树时会短暂拉起 TestActivity，它不是用户真正离开的前台应用。
+        if current.package_name == _POCO_SERVICE_PACKAGE and self._last_activity.package_name:
+            return self._last_activity
+        if current.package_name:
+            self._last_activity = current
+        return current
 
     def _dump_accessibility_tree(self) -> list[UiNode]:
         shell = getattr(self._manager.dev, "shell", None)
@@ -253,6 +267,8 @@ def _parse_resumed_activity(raw: Any) -> ActivityInfo | None:
         if match is None:
             continue
         package_name = match.group("package")
+        if package_name == _POCO_SERVICE_PACKAGE:
+            continue
         activity_name = match.group("activity")
         if activity_name.startswith("."):
             activity_name = activity_name[1:]

@@ -6,13 +6,20 @@
 - 同一播放状态出现新 ID/描述时，在原 target 内追加 locator；出现新的播放页面或奖励流程时，
   才新增 target 或专用步骤。保留旧标记，target_id 和策略名称不要随意改名，便于查日志。
 
-每日流程：启动应用 -> 回到首页 -> 恢复或确认播放 -> 保持一段音频会话。
+阅读与调参：
+- 本文件从上到下依次声明首页、播放状态、音频会话和喜马拉雅独有的冷启动恢复；
+  target 和 locator 的中文名称会原样进入日志，可直接对应真机命中过程。
+- 会话参数在 config/automation.json 的 ximalaya.options 调整：audio_session_seconds_* 控制收听时长，
+  audio_check_interval_seconds 控制低频检查间隔，skip_content 可临时跳过音频任务。
+
+每日流程：启动应用 -> 回到首页 -> 恢复或确认播放 -> 保持一段音频会话 -> 停止应用。
 
 任务与限制：
 - 当前只听书，不执行签到、余额、时段奖励和广告任务。
 - 音频会话时长和检查间隔由配置控制，不做高频 UI 解析。
 - 低频发现应用离开前台后才回首页；App 已自动续播时直接继续，否则点击恢复播放。
 - 冷启动后播放条可能晚于首页出现，仅在首次缺失时由本 App 播放策略短暂重试一次。
+- 音频任务结束后强制停止喜马拉雅，避免流程完成后继续在后台播放。
 - WelComeActivity 是已知过渡页，允许有限等待；恢复失败会记录当时前台包名和 Activity。
 
 页面与状态标记：
@@ -38,6 +45,7 @@ from hym.core.pages import ObservationProfile, PageSpec
 from hym.runtime.audio import AudioContentTask, AudioPlayback, DefaultAudioPlayback
 from hym.runtime.context import AppContext
 from hym.runtime.navigation import NavigationController
+from hym.runtime.workflow import StepDefinition, StepOutcome
 
 
 def ximalaya_spec() -> AppSpec:
@@ -143,8 +151,21 @@ class XimalayaPlayback:
         return self.fallback.ensure_playing(context, spec)
 
 
+@dataclass(frozen=True, slots=True)
+class XimalayaStopTask:
+    """结束本轮任务后停止应用，确保后台音频同步结束。"""
+
+    app: AppIdentity
+
+    def run(self, context: AppContext) -> StepOutcome:
+        result = context.session.stop_app(self.app)
+        if not result.succeeded:
+            return StepOutcome.failure(f"停止喜马拉雅失败: {result.message}")
+        return StepOutcome.success("喜马拉雅已停止，后台音频已结束")
+
+
 def create_plugin() -> ComposedAppPlugin:
-    """喜马拉雅只组合音频会话与专用播放入口策略。"""
+    """组合音频会话、专用播放入口和 App 级停止步骤。"""
 
     spec = ximalaya_spec()
     navigation = NavigationController(spec)
@@ -157,8 +178,19 @@ def create_plugin() -> ComposedAppPlugin:
         navigation,
         XimalayaPlayback(DefaultAudioPlayback()),
     )
+    stop_task = XimalayaStopTask(spec.identity)
     return create_daily_plugin(
         spec,
         navigation=navigation,
         content_handler=content.run,
+        extra_steps=lambda _: (
+            StepDefinition(
+                "停止应用",
+                "停止喜马拉雅",
+                stop_task.run,
+                max_attempts=2,
+                capture_on_failure=False,
+                allow_interruption_after=False,
+            ),
+        ),
     )

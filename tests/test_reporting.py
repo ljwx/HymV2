@@ -53,7 +53,7 @@ class DurableHttpEventSinkTest(unittest.TestCase):
             self.assertFalse(queue.exists())
             self.assertEqual(2, attempts)
 
-    def test_failed_upload_uses_backoff_instead_of_retrying_each_event(self):
+    def test_progress_events_do_not_upload_during_device_operations(self):
         attempts = 0
 
         def fail(method, url, headers, body):
@@ -67,7 +67,7 @@ class DurableHttpEventSinkTest(unittest.TestCase):
             for index in range(12):
                 sink.emit(self._event(f"event-{index}", "step.progress"))
 
-            self.assertEqual(1, attempts)
+            self.assertEqual(0, attempts)
             self.assertEqual(12, len(queue.read_text(encoding="utf-8").splitlines()))
 
     def test_events_before_cycle_are_local_only(self):

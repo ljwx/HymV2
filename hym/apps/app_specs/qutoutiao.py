@@ -6,8 +6,15 @@
 - 同一业务状态出现新 ID/文案时，在原 target 内追加 locator；出现新的签到页或文章类型时，
   才新增 target 或 CheckInStageSpec。保留旧标记，target_id 和策略名称不要随意改名，便于查日志。
 
-每日流程：启动并关闭首页奖励弹窗 -> 签到/浏览文章随机先后 -> 按概率执行广告任务。
-余额记录随机插入整轮流程，首次失败时在收尾补一次。趣头条当前没有时段奖励流程。
+阅读与调参：
+- 本文件从上到下依次声明页面导航、首页弹窗、激励广告、签到、余额、文章浏览和专用导航恢复；
+  target 和 locator 的中文名称会原样进入日志，可直接对应真机命中过程。
+- 次数、概率和等待时长不写死在流程里，在 config/automation.json 的 qutoutiao.options 调整：
+  content_count_* 控制文章数量，news_* 控制阅读深度和停留，*_probability 控制随机行为，
+  ad_task_count_* 和 ad_* 控制广告轮数及等待，skip_content 可临时跳过内容任务。
+
+每日流程：启动并关闭首页奖励弹窗 -> 签到/浏览文章随机先后；余额记录随机插入整轮流程，
+首次失败时在收尾补一次。趣头条当前没有时段奖励，也不主动点击不稳定的独立广告任务入口。
 
 任务与限制：
 - 签到每天最多完成一次。按当前页面动态匹配“直接签到”或“立即签到”，不是固定步骤链。
@@ -15,7 +22,9 @@
 - taskcenter_sign_in_ad_rv 只是兼容旧版的被动完成信号，仅在页面不存在可点击签到分支时使用。
 - 余额每天只成功记录一次，读取任务页顶部数字；失败不写当天完成状态。
 - 随机打开文章，确认详情页后滚动；看到底部、点赞、查看评论都按配置概率执行，不发表评论。
-- 广告失败不阻断文章流程，公共恢复逻辑会先返回首页，必要时重启应用。
+- 信息流推广可能深链到其他 App；只有仍在趣头条且命中详情标记才计为文章，外部推广直接返回。
+- 签到或导航途中出现的广告会播放后返回；退出失败不阻断文章流程，必要时重启应用。
+- 任务页“体验领金币/看视频领金币”可能跳到浏览器下载页，不作为激励广告入口；找到稳定入口后再在本文件启用。
 - 导航途中自动拉起已知广告 Activity 时，由本 App 导航策略完成一轮广告后再重试任务页。
 
 页面与状态标记：
@@ -147,6 +156,7 @@ def qutoutiao_spec() -> AppSpec:
         final_close_targets=(ad_close,),
         exit_targets=(task_marker, home_tab),
         completion_wait_seconds=33.0,
+        exit_after_wait_with_back=True,
     )
 
     return AppSpec(
@@ -160,6 +170,7 @@ def qutoutiao_spec() -> AppSpec:
             launch_intercepts=(home_reward_popup,),
             home_intercepts=(home_reward_popup,),
             task_dismiss=(),
+            home_attempts=8,
             home_page=PageSpec(
                 "qutoutiao.home",
                 package_name,
@@ -236,6 +247,14 @@ def qutoutiao_spec() -> AppSpec:
             feed_item=target(
                 "趣头条随机文章",
                 query_locator(
+                    "当前文章标题ID",
+                    priority=10,
+                    options={
+                        "resource_id": prefix + "inew_text_title",
+                        "pick": "random",
+                    },
+                ),
+                query_locator(
                     "当前文章标题",
                     options={
                         "resource_id": prefix + "inew_text_title",
@@ -264,7 +283,6 @@ def qutoutiao_spec() -> AppSpec:
             comment_target=text_target("趣头条浏览评论", "全部评论", contains=True),
             bottom_marker=text_target("趣头条文章底部", "相关推荐", contains=True),
         ),
-        ad_entry=text_target("趣头条广告任务入口", "看广告领奖励"),
         observation_profile=observation_profile,
     )
 

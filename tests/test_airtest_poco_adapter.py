@@ -22,6 +22,10 @@ class StubImage:
 class StubDev:
     def __init__(self):
         self.calls = []
+        self.activity_output = (
+            "topResumedActivity=ActivityRecord{123456 u0 "
+            "com.example/com.example.RealActivity t123}"
+        )
 
     def touch(self, position, duration):
         self.calls.append(("touch", position, duration))
@@ -46,10 +50,7 @@ class StubDev:
 <hierarchy rotation="0"><node text="任务中心" resource-id="com.example:id/task"
 class="android.widget.TextView" content-desc="" clickable="false" enabled="true"
 selected="false" bounds="[100,200][900,400]" /></hierarchy>"""
-        return (
-            "topResumedActivity=ActivityRecord{123456 u0 "
-            "com.example/com.example.RealActivity t123}"
-        )
+        return self.activity_output
 
     def disconnect(self):
         self.calls.append(("disconnect",))
@@ -87,12 +88,13 @@ class StubManager:
         self.poco = StubPoco()
         self.started = []
         self.stopped = []
+        self.top_activity = ("com.example", "MainActivity")
 
     def get_screen_size(self):
         return 1000, 2000
 
     def get_top_activity(self):
-        return "com.example", "MainActivity"
+        return self.top_activity
 
     def start_app(self, package_name):
         self.started.append(package_name)
@@ -136,10 +138,35 @@ class AirtestPocoDeviceAdapterTest(unittest.TestCase):
         self.assertEqual("BGR", observation.screenshot.pixel_format)
         self.assertEqual(10, observation.screenshot.width)
 
-    def test_system_key_is_mapped_without_exposing_airtest(self):
-        self.adapter.press(SystemKey.BACK)
+    def test_poco_service_activity_falls_back_to_real_foreground_app(self):
+        self.manager.dev.activity_output = (
+            "topResumedActivity=ActivityRecord{123456 u0 "
+            "com.netease.open.pocoservice/.TestActivity t123}"
+        )
 
-        self.assertEqual(("keyevent", "BACK"), self.manager.dev.calls[-1])
+        result = self.adapter.observe(ObservationRequest(include_ui_tree=False))
+
+        self.assertTrue(result.succeeded)
+        self.assertEqual("com.example", result.observation.activity.package_name)
+        self.assertEqual("MainActivity", result.observation.activity.activity_name)
+
+    def test_poco_service_activity_uses_recently_started_app_when_fallback_is_transient(self):
+        self.adapter.start_app(self.app)
+        self.manager.dev.activity_output = (
+            "topResumedActivity=ActivityRecord{123456 u0 "
+            "com.netease.open.pocoservice/.TestActivity t123}"
+        )
+        self.manager.top_activity = ("com.netease.open.pocoservice", "TestActivity")
+
+        result = self.adapter.observe(ObservationRequest(include_ui_tree=False))
+
+        self.assertTrue(result.succeeded)
+        self.assertEqual("com.example", result.observation.activity.package_name)
+
+    def test_system_key_is_mapped_without_exposing_airtest(self):
+        self.adapter.press(SystemKey.SLEEP)
+
+        self.assertEqual(("keyevent", "SLEEP"), self.manager.dev.calls[-1])
 
     def test_text_input_supports_chinese_without_pressing_enter(self):
         result = self.adapter.input_text("最近怎么样")

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from hym.core.config import AppRunSettings, BehaviorSettings, InterruptionSettings
 from hym.core.events import InMemoryEventSink
-from hym.core.models import AppIdentity, DeviceDescriptor, SystemKey
+from hym.core.models import ActionResult, AppIdentity, DeviceDescriptor, SystemKey
 from hym.runtime.behavior import BehaviorTiming
 from hym.runtime.context import AppContext
 from hym.runtime.interruption import (
@@ -62,7 +62,10 @@ def _job(app_id):
     )
     plugin = SimpleNamespace(
         app_id=app_id,
-        spec=SimpleNamespace(display_name=app_id),
+        spec=SimpleNamespace(
+            display_name=app_id,
+            identity=AppIdentity(app_id, f"com.example.{app_id}", app_id),
+        ),
     )
     execution = WorkflowExecutor().create("daily", "每日任务", ())
     return _AppJob(AppRunSettings(app_id), plugin, context, execution), events
@@ -154,6 +157,41 @@ class InterruptionHandlingTest(unittest.TestCase):
         )
 
 
+class CycleCleanupTest(unittest.TestCase):
+    def test_stops_cycle_apps_before_locking_screen(self):
+        operations = []
+        session = SimpleNamespace(
+            stop_app=lambda app: (
+                operations.append(("stop_app", app.app_id))
+                or ActionResult.success("stop_app")
+            ),
+            press=lambda key: (
+                operations.append(("press", key))
+                or ActionResult.success("press")
+            ),
+        )
+        worker = object.__new__(DeviceWorker)
+        worker.session = session
+        events = []
+        worker._emit_worker_event = lambda *args, **kwargs: events.append((args, kwargs))
+        first, _ = _job("kuaishou")
+        second, _ = _job("douyin")
+
+        issues = worker._finish_cycle([first, second], "cycle-1")
+
+        self.assertEqual(0, issues)
+        self.assertEqual(
+            [
+                ("stop_app", "kuaishou"),
+                ("stop_app", "douyin"),
+                ("press", SystemKey.SLEEP),
+            ],
+            operations,
+        )
+        self.assertEqual("runtime.cycle.cleanup.finished", events[0][0][1])
+        self.assertEqual("success", events[0][1]["status"])
+
+
 class DeviceWorkerSchedulingTest(unittest.TestCase):
     def test_worker_switches_apps_and_resumes_original_cursor(self):
         operations = []
@@ -197,6 +235,7 @@ class DeviceWorkerSchedulingTest(unittest.TestCase):
             lambda trace_id, setting, plugin: contexts[setting.app_id]
         )
         worker._finish_app = lambda context, app: None
+        worker._finish_cycle = lambda jobs, trace_id: 0
         cycle_events = []
         worker._emit_worker_event = (
             lambda *args, **kwargs: cycle_events.append((args, kwargs))

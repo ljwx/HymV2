@@ -353,6 +353,16 @@ class ExtensibilityTest(unittest.TestCase):
         ximalaya = ximalaya_spec()
 
         self.assertEqual(2, douyin.navigation.home_page.minimum_markers)
+        self.assertEqual(
+            (douyin.navigation.home_tab, douyin.content.feed_marker),
+            douyin.navigation.home_page.markers,
+        )
+        self.assertTrue(
+            any(
+                locator.query == "推荐"
+                for locator in douyin.content.feed_marker.locators
+            )
+        )
         self.assertIn(
             douyin.navigation.task_marker,
             douyin.navigation.home_page.forbidden_markers,
@@ -373,6 +383,9 @@ class ExtensibilityTest(unittest.TestCase):
             {locator.query for locator in ad_activity.locators},
         )
         self.assertTrue(all(locator.kind is LocatorKind.ACTIVITY for locator in ad_activity.locators))
+        self.assertTrue(qutoutiao.ad.exit_after_wait_with_back)
+        self.assertIsNone(qutoutiao.ad_entry)
+        self.assertEqual(8, qutoutiao.navigation.home_attempts)
 
 
 if __name__ == "__main__":

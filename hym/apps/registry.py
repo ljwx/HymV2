@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+from pathlib import Path
 from typing import Protocol
 
 from hym.apps.app_specs.douyin import create_plugin as create_douyin_plugin
@@ -68,4 +70,28 @@ def create_default_registry() -> AppRegistry:
     )
     for plugin_factory in plugin_factories:
         registry.register(plugin_factory())
+    return registry
+
+
+def create_configured_registry(
+    config_path: str | Path,
+    app_ids: Iterable[str],
+) -> AppRegistry:
+    """按运行配置补充需要外部配置的插件。"""
+
+    registry = create_default_registry()
+    if "wechat" not in set(app_ids):
+        return registry
+
+    from wechat_automation.config import WechatSettings, load_wechat_settings
+    from wechat_automation.plugin import WechatPlugin
+
+    runtime_path = Path(config_path).resolve()
+    wechat_path = runtime_path.with_name("wechat.local.json")
+    settings = (
+        load_wechat_settings(wechat_path)
+        if wechat_path.exists()
+        else WechatSettings(runtime_config=runtime_path)
+    )
+    registry.register(WechatPlugin(settings))
     return registry

@@ -144,7 +144,7 @@ class LoggingSettings:
 
 @dataclass(frozen=True, slots=True)
 class ReportingSettings:
-    """运行数据批量上报；密钥默认从环境变量读取，避免写入仓库。"""
+    """运行数据批量上报；密钥从环境变量或本机文件读取，避免写入仓库。"""
 
     enabled: bool = False
     server_url: str = ""
@@ -185,13 +185,10 @@ class ProcessSettings:
 @dataclass(frozen=True, slots=True)
 class DiagnosticsSettings:
     consecutive_failure_threshold: int = 3
-    capture_every_failures: int = 3
 
     def __post_init__(self) -> None:
         if self.consecutive_failure_threshold < 2:
             raise ValueError("诊断采集阈值至少为 2 次")
-        if self.capture_every_failures < 1:
-            raise ValueError("重复诊断采集间隔必须大于零")
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,8 +277,14 @@ def load_runtime_settings(path: str | Path) -> RuntimeSettings:
     logging = LoggingSettings(**raw.get("logging", {}))
     reporting_values = dict(raw.get("reporting", {}))
     ingest_key_env = str(reporting_values.pop("ingest_key_env", "JDCR_AUTOMATION_INGEST_KEY"))
+    ingest_key_file = str(reporting_values.pop("ingest_key_file", "")).strip()
     if not reporting_values.get("ingest_key"):
         reporting_values["ingest_key"] = os.environ.get(ingest_key_env, "")
+    if not reporting_values.get("ingest_key") and ingest_key_file:
+        key_path = Path(ingest_key_file).expanduser()
+        if not key_path.is_absolute():
+            key_path = (base_dir / key_path).resolve()
+        reporting_values["ingest_key"] = key_path.read_text(encoding="utf-8").strip()
     reporting = ReportingSettings(**reporting_values)
     processes = ProcessSettings(**raw.get("processes", {}))
     diagnostics = DiagnosticsSettings(**raw.get("diagnostics", {}))

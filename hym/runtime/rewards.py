@@ -213,7 +213,7 @@ class BalanceTask:
 
     def run(self, context: AppContext) -> StepOutcome:
         recorded = context.daily_value("balance")
-        if _has_structured_balance(recorded):
+        if _has_recorded_balance(recorded):
             return StepOutcome(WorkflowStatus.ALREADY_DONE, "今天已经记录过余额")
         spec = self.app_spec.balance
         if spec is None:
@@ -325,11 +325,13 @@ class BalanceTask:
         return StepOutcome.success("余额记录完成", balances=values)
 
 
-def _has_structured_balance(recorded: object) -> bool:
+def _has_recorded_balance(recorded: object) -> bool:
     if not isinstance(recorded, dict):
         return False
     value = recorded.get("value")
-    return isinstance(value, dict) and bool(value.get("balances"))
+    if not isinstance(value, dict):
+        return False
+    return bool(value.get("balances") or value.get("value"))
 
 
 def _amount_minor(value: str | None, scale: int) -> int | None:

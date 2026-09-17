@@ -171,6 +171,30 @@ class BehaviorTimingTest(unittest.TestCase):
             self.assertEqual(0.2, settings.interruptions.checkpoint_probability)
             self.assertEqual(3, settings.interruptions.max_per_cycle)
 
+    def test_reporting_key_can_be_loaded_from_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "ingest-key").write_text("file-secret\n", encoding="utf-8")
+            path = root / "automation.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "reporting": {
+                            "enabled": True,
+                            "server_url": "http://server:8080",
+                            "ingest_key_env": "HYM_TEST_MISSING_INGEST_KEY",
+                            "ingest_key_file": "ingest-key",
+                        },
+                        "devices": [{"device_id": "d1", "apps": []}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            settings = load_runtime_settings(path)
+
+            self.assertEqual("file-secret", settings.reporting.ingest_key)
+
     def test_project_video_classification_policy_matches_device_observations(self):
         config_path = Path(__file__).resolve().parents[1] / "config" / "automation.json"
         settings = load_runtime_settings(config_path)
@@ -182,6 +206,9 @@ class BehaviorTimingTest(unittest.TestCase):
 
         self.assertTrue(apps["kuaishou"].options["treat_unclassified_as_suspected_ad"])
         self.assertFalse(apps["douyin"].options["treat_unclassified_as_suspected_ad"])
+        self.assertEqual(0.002, apps["kuaishou"].options["follow_probability"])
+        self.assertEqual(0.002, apps["douyin"].options["follow_probability"])
+        self.assertFalse(apps["ximalaya"].options["allow_interruptions"])
 
     def test_old_top_level_ranges_infer_normal_parameters(self):
         with tempfile.TemporaryDirectory() as directory:

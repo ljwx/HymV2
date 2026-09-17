@@ -44,6 +44,7 @@ class SystemKey(str, Enum):
     VOLUME_UP = "volume_up"
     VOLUME_DOWN = "volume_down"
     POWER = "power"
+    SLEEP = "sleep"
 
 
 class UiTreeSource(str, Enum):

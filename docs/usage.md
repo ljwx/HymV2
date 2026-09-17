@@ -1,5 +1,8 @@
 # 使用说明
 
+PyCharm 可直接运行根目录 `main.py`，流程日志会实时显示在 Run 控制台。调试单轮时在
+运行参数中添加 `--once --direct`；正式多设备运行不加 `--direct`。
+
 ## 运行前准备
 
 1. 打开手机的 USB 调试，执行 `adb devices` 确认设备在线。
@@ -28,9 +31,9 @@
 只运行某台设备可重复使用 `--device`，只验证某个 App 可重复使用 `--app`；`--direct` 不创建工作进程，仅用于单设备调试：
 
 ```bash
-.venv/bin/python -m hym --once --device 23a6524e
-.venv/bin/python -m hym --once --direct --device 23a6524e
-.venv/bin/python -m hym --once --direct --device 23a6524e --app kuaishou
+.venv/bin/python -m hym --once --device NAB0220416035468
+.venv/bin/python -m hym --once --direct --device NAB0220416035468
+.venv/bin/python -m hym --once --direct --device NAB0220416035468 --app kuaishou
 ```
 
 ## 常用配置
@@ -46,7 +49,8 @@
 - `enable_ocr`：默认 `false`。OCR 只作为目标自身声明的后备定位，不会对每次操作全屏识别。
 - `console_level` / `jsonl_level`：分别控制控制台与结构化日志级别，可选 `debug`、`info`、`warning`、`error`。
 - `consecutive_failure_threshold`：同一设备、App、工作流和步骤连续失败多少次后保存现场，默认 3。
-- `capture_every_failures`：达到阈值后，每增加多少次失败再保存一次，避免重复截图。
+
+同一种失败连续出现时只保存一次现场；步骤恢复成功后才重新计数，避免截图目录持续增长。
 
 顶层 `interruptions` 控制任务插空，不属于某个 App 的业务配置：
 
@@ -71,7 +75,7 @@
 - `suspected_ad_duration_*`：疑似广告的短暂停留分布，和明确广告、普通视频分别配置。
 - `normal/full_watch/long/unclassified_post_classification_min_seconds`：完成内容分类后至少继续停留多久，避免识别结束后立刻滑走。
 - `like_probability`、`comment_probability`、`works_probability`：点赞、查看评论、浏览作者作品的概率。
-- `follow_probability`：关注作者的概率，默认 `0.011`，可按 App 独立调整。
+- `follow_probability`：关注作者的概率，默认 `0.002`，可按 App 独立调整。
 - `read_to_bottom_probability`：新闻是否继续阅读到底部的概率。
 - `execute_ad_probability`、`ad_task_count_min/center/max/stddev`：是否执行广告任务及单轮次数。
 - `ad_entry_search_swipes`：广告入口不在当前屏幕时最多向上查找几次，默认 2。
@@ -80,7 +84,7 @@
 - `ad_completion_settle_seconds_min/center/max/stddev`：确认广告完成后继续停留的时间；当前为 `1~10` 秒、中心值 `5` 秒。
 - `ad_fallback_wait_seconds`：没有可靠完成信号或在时限内始终未命中时的奖励等待兜底。
 - `allow_interruptions`：是否允许当前 App 参与安全点插空；长时任务可按真实规则单独关闭。
-- `stop_app_probability`：一个 App 流程结束后停止应用的概率。
+- `stop_app_probability`：轮次内部完成单个 App 后立即停止它的概率。整轮结束时仍会统一停止本轮涉及的所有 App，并锁定屏幕。
 - `skip_content`：临时跳过该 App 的内容浏览。
 - `audio_session_seconds_min/center/max/stddev`：长时音频单轮保持播放的时长分布，会应用 `timing_scale`。
 - `audio_check_interval_seconds`：音频会话低频确认前台状态的间隔，最小 15 秒。
@@ -148,6 +152,7 @@ rg 'workflow.finished|workflow.suspended|runtime.interruption|diagnostic.thresho
     "enabled": true,
     "server_url": "http://192.168.1.10:8080",
     "ingest_key_env": "JDCR_AUTOMATION_INGEST_KEY",
+    "ingest_key_file": "~/.config/hymv2/automation-ingest-key",
     "level": "info",
     "batch_size": 100,
     "timeout_seconds": 10.0,
@@ -157,14 +162,15 @@ rg 'workflow.finished|workflow.suspended|runtime.interruption|diagnostic.thresho
 }
 ```
 
-启动前在当前终端设置 Server 使用的同一写入密钥：
+上报密钥优先从 `ingest_key_env` 指定的环境变量读取；环境变量为空时，再读取 `ingest_key_file`。本机长期运行建议把 Server 的写入密钥保存到用户配置目录，并限制文件权限：
 
 ```bash
-export JDCR_AUTOMATION_INGEST_KEY="服务端上报密钥"
+mkdir -p ~/.config/hymv2
+install -m 600 /path/to/automation-ingest-key ~/.config/hymv2/automation-ingest-key
 .venv/bin/python -m hym --once
 ```
 
-写入密钥只用于上报，不能读取 Server 数据，也不要直接写进配置文件。事件先追加到 `runtime/report_queue/<设备ID>.jsonl`，达到 `batch_size` 或本轮结束时批量发送。网络失败、服务不可用或证据上传失败不会中断 App 任务，本地队列会保留；失败后至少等待 `retry_interval_seconds` 才再试，避免断网时每条事件都消耗超时。事件以 `event_id` 去重。
+也可以不配置密钥文件，只在启动前执行 `export JDCR_AUTOMATION_INGEST_KEY="服务端上报密钥"`。写入密钥只用于上报，不能读取 Server 数据，也不要直接写进配置文件。事件先追加到 `runtime/report_queue/<设备ID>.jsonl`，达到 `batch_size` 或本轮结束时批量发送。网络失败、服务不可用或证据上传失败不会中断 App 任务，本地队列会保留；失败后至少等待 `retry_interval_seconds` 才再试，避免断网时每条事件都消耗超时。事件以 `event_id` 去重。
 
 `upload_artifacts` 开启后，达到重复失败阈值产生的截图、UI 树和执行上下文会跟随事件上传。正常流程不会为上报额外截图。Android App 登录同一 Server 后，从“设置 > 数据 > 运行中心”查看今天或近 7 天的数据。“执行”页在一屏内展示总用时、完成步数、每分钟效率、异常、各 App 余额和执行记录；“微信资产”页展示零钱和最近 10 笔去重账单。从第二个业务日起，余额行会显示“较昨日”；中间日期缺失时显示“较上次”。
 

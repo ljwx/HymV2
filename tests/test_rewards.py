@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 
-from hym.apps.app_specs import kuaishou_spec
+from hym.apps.app_specs import kuaishou_spec, qutoutiao_spec
 from hym.core.models import WorkflowStatus
 from hym.runtime.rewards import BalanceTask, DurationRewardTask
 
@@ -50,6 +50,18 @@ class RewardTaskTest(unittest.TestCase):
         self.assertIsNotNone(balance)
         self.assertIsNone(balance.enter_target)
         self.assertEqual(["coin", "cash"], [asset.asset_key for asset in balance.assets])
+
+    def test_single_value_balance_is_not_recorded_twice(self):
+        actions = StubActions()
+        current = context(actions)
+        current.daily_value = lambda _: {
+            "value": {"value": "约0.0元", "artifacts": []},
+            "recorded_at": "2026-09-17T12:00:00+08:00",
+        }
+
+        outcome = BalanceTask(qutoutiao_spec(), lambda _: False).run(current)
+
+        self.assertEqual(WorkflowStatus.ALREADY_DONE, outcome.status)
 
     def test_duration_reward_cleans_popup_after_unconfirmed_result(self):
         spec = kuaishou_spec()

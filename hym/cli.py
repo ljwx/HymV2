@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from hym.apps.registry import create_default_registry
+from hym.apps.registry import create_configured_registry
 from hym.core.config import load_runtime_settings
 from hym.runtime.recorder import run_manual_flow_recording
 from hym.runtime.runner import run_device_from_config
@@ -32,7 +32,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"配置校验成功: {config_path}")
         return 0
     if args.list_apps:
-        print("已注册应用: " + "、".join(create_default_registry().app_ids()))
+        configured_apps = (
+            app.app_id
+            for device in settings.devices
+            for app in device.apps
+            if app.enabled
+        )
+        registry = create_configured_registry(config_path, configured_apps)
+        print("已注册应用: " + "、".join(registry.app_ids()))
         return 0
     if args.record_flow:
         selected = args.device or [settings.devices[0].descriptor.device_id]

@@ -40,7 +40,6 @@ class WorkflowDiagnosticsTest(unittest.TestCase):
             events=self.events,
             diagnostics=self.diagnostics,
             diagnostic_failure_threshold=3,
-            diagnostic_capture_interval=3,
         )
 
     def test_captures_only_after_three_consecutive_failures(self):
@@ -54,6 +53,10 @@ class WorkflowDiagnosticsTest(unittest.TestCase):
 
         self.assertEqual(1, len(self.diagnostics.calls))
         self.assertEqual(3, self.diagnostics.calls[0][1]["consecutive_failure_count"])
+
+        for _ in range(3):
+            WorkflowExecutor().run(self.context, "daily", "每日任务", [step])
+        self.assertEqual(1, len(self.diagnostics.calls))
 
     def test_partial_step_makes_workflow_partial(self):
         step = StepDefinition(

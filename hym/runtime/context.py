@@ -44,7 +44,6 @@ class AppContext:
         events: EventSinkPort,
         diagnostics: DiagnosticsService,
         diagnostic_failure_threshold: int = 3,
-        diagnostic_capture_interval: int = 3,
         cycle_id: str | None = None,
         app_run_id: str | None = None,
         business_date: date | None = None,
@@ -60,7 +59,6 @@ class AppContext:
         self.events = events
         self.diagnostics = diagnostics
         self.diagnostic_failure_threshold = diagnostic_failure_threshold
-        self.diagnostic_capture_interval = diagnostic_capture_interval
         self.cycle_id = cycle_id or uuid4().hex
         self.app_run_id = app_run_id or uuid4().hex
         # 同一轮执行跨过午夜时，签到和余额仍归属轮次开始当天。
@@ -266,10 +264,7 @@ class AppContext:
         previous = previous if isinstance(previous, dict) else {}
         same_failure = previous.get("last_message") == message
         count = int(previous.get("count", 0)) + 1 if same_failure else 1
-        last_captured = int(previous.get("last_captured_count", 0)) if same_failure else 0
-        should_capture = count >= self.diagnostic_failure_threshold and (
-            last_captured == 0 or count - last_captured >= self.diagnostic_capture_interval
-        )
+        should_capture = count == self.diagnostic_failure_threshold
         self.state.set(
             self.namespace,
             key,
@@ -277,7 +272,6 @@ class AppContext:
                 "count": count,
                 "last_message": message,
                 "last_failed_at": self.timing.clock.now().isoformat(),
-                "last_captured_count": count if should_capture else last_captured,
             },
         )
         return count, should_capture

@@ -29,7 +29,6 @@ class NavigationSpec:
     page_wait_seconds: float = 4.0
     home_attempts: int = 5
     reselect_home_tab: bool = True
-    visual_task_to_home_recovery: bool = False
     transient_activity_patterns: tuple[str, ...] = ()
     home_page: PageSpec | None = None
     task_page: PageSpec | None = None

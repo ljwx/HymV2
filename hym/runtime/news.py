@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from hym.apps.specs import NewsContentSpec
 from hym.core.models import SystemKey, WorkflowStatus
+from hym.core.pages import PageSpec
 from hym.runtime.context import AppContext
 from hym.runtime.navigation import NavigationController
 from hym.runtime.workflow import StepOutcome
@@ -31,14 +32,36 @@ class NewsContentTask:
             )
         count = int(progress["target_count"])
         viewed = int(progress.get("viewed", 0))
+        detail_page = PageSpec(
+            f"{context.app.app_id}.news.detail",
+            context.app.package_name,
+            (self.spec.detail_marker,),
+            observation_profile=context.observation_profile,
+        )
         for index in range(int(progress.get("next_index", 1)), count + 1):
             if not context.actions.tap_target(self.spec.feed_item, timeout=2.0):
                 context.actions.swipe_up()
                 context.timing.operation_delay()
                 continue
             context.timing.wait(float(context.option("detail_wait_seconds", 3.0)))
-            if not context.actions.exists(self.spec.detail_marker, timeout=2.0):
+            detail_result = context.actions.match_page(detail_page)
+            if not detail_result.matched:
+                activity = detail_result.observation.activity if detail_result.observation else None
+                external_package = activity.package_name if activity else ""
+                if external_package and external_package != context.app.package_name:
+                    context.emit(
+                        "content.external.skipped",
+                        "外部推广已跳过",
+                        f"第 {index} 个信息流卡片打开了外部应用，返回新闻首页",
+                        workflow_id="daily",
+                        step_id="浏览内容",
+                        status="skipped",
+                        data={"index": index, "external_package": external_package},
+                    )
                 context.actions.press(SystemKey.BACK)
+                if external_package and external_package != context.app.package_name:
+                    context.timing.operation_delay()
+                    self.navigation.go_home(context)
                 context.actions.swipe_up()
                 continue
 

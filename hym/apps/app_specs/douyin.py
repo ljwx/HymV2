@@ -6,6 +6,13 @@
 - 同一业务状态出现新 ID/文案时，在原 target 内追加 locator；出现新的页面状态或流程分支时，
   才新增 target 或 CheckInStageSpec。保留旧标记，target_id 和策略名称不要随意改名，便于查日志。
 
+阅读与调参：
+- 本文件从上到下依次声明页面导航、激励广告、签到、余额、时段奖励、视频分类与互动；
+  target 和 locator 的中文名称会原样进入日志，可直接对应真机命中过程。
+- 次数、概率和等待时长不写死在流程里，在 config/automation.json 的 douyin.options 调整：
+  content_count_* 控制刷视频数量，*_duration_* 控制各类视频时长，*_probability 控制随机行为，
+  ad_task_count_* 和 ad_* 控制广告轮数及等待，skip_content 可临时跳过内容任务。
+
 每日流程：启动应用 -> 签到/刷视频随机先后 -> 领取时段奖励 -> 按概率执行广告任务；
 余额在这些步骤中随机插入，首次没记录成功时会在收尾补一次。
 
@@ -13,7 +20,7 @@
 - 签到每天最多完成一次，并按当前页面动态匹配新版面板、旧版进度条或确认领取页。
 - “去签到”和旧版“进度条”只负责打开下一层，不算领取；“主动签到/立即签到领”才是提交动作。
 - 命中“已签到N天”或“打开签到提醒按钮”才确认完成。提交后状态不明时当天不重复领取。
-- 余额每天只成功记录一次。当前节点只适合截图留证，尚未稳定解析出余额文字。
+- 余额从任务页顶部识别金币和现金；两个字段都命中后每天记录一次，失败时不写完成状态。
 - 时段奖励匹配“开宝箱得金币”或右下角“领N”，兼容到账提示和“获得开宝箱奖励”弹窗，可继续看奖励广告。
 - 刷视频时先分类广告、长视频和普通视频；明确广告只短暂停留且禁止互动。
 - 当前普通视频标记覆盖不足，未分类内容按普通观看节奏浏览且不互动，不直接当成疑似广告。
@@ -22,7 +29,7 @@
 - 明确广告仍快速划走；后续只有找到可靠的新广告信号，才补进广告标记组。
 
 页面与状态标记：
-- 首页：root_view + user_avatar/viewpager，且不能出现任务页标记；首页标签：“首页”。
+- 首页：底部“首页” + 视频流标记（user_avatar/viewpager/顶部“推荐”任选），且不能出现任务页标记。
 - 已确认处于视频流时不重复点击“首页”，避免在单视频和视频列表之间切换。
 - 任务入口：描述“福袋”，兼容图片、底栏结构和底部“赚钱”OCR；任务页：“每天都能领金币”/
   “已签到N天”/标题“赚钱任务”/新版签到或看视频任务描述。
@@ -124,6 +131,12 @@ def douyin_spec() -> AppSpec:
         "抖音内容标记",
         id_locator("用户头像ID", prefix + "user_avatar"),
         id_locator("视频容器ID", prefix + "viewpager", priority=11),
+        text_locator(
+            "推荐顶部文本",
+            "推荐",
+            region=Rect(0.55, 0.04, 0.85, 0.16),
+            priority=20,
+        ),
         required=True,
     )
 
@@ -223,11 +236,10 @@ def douyin_spec() -> AppSpec:
             task_entry,
             task_marker,
             reselect_home_tab=False,
-            visual_task_to_home_recovery=True,
             home_page=PageSpec(
                 "douyin.home",
                 package_name,
-                (home_marker, feed_marker),
+                (home_tab, feed_marker),
                 forbidden_markers=(task_marker,),
                 activity_patterns=(r"SplashActivity$",),
                 minimum_markers=2,

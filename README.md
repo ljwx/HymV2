@@ -12,6 +12,8 @@
 # 每个启用的 App 执行一轮
 .venv/bin/python -m hym --once
 
+# PyCharm 可直接运行根目录 main.py；调试单轮时添加参数 --once --direct
+
 # 手工操作新流程，并记录每一步前后的页面证据
 .venv/bin/python -m hym --record-flow "新奖励流程" --record-app kuaishou
 ```

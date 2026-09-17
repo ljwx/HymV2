@@ -9,7 +9,7 @@ from uuid import uuid4
 from hym.adapters.airtest_poco import AirtestPocoDeviceFactory
 from hym.adapters.local import AtomicJsonStateStore, LocalArtifactStore, SystemClock, SystemRandomSource
 from hym.adapters.reporting import DurableHttpEventSink
-from hym.apps.registry import AppPlugin, AppRegistry, create_default_registry
+from hym.apps.registry import AppPlugin, AppRegistry, create_configured_registry
 from hym.core.config import AppRunSettings, DeviceRunSettings, RuntimeSettings, load_runtime_settings
 from hym.core.events import (
     AutomationEvent,
@@ -59,19 +59,10 @@ def run_device_from_config(
             names = "、".join(sorted(selected))
             raise ValueError(f"设备 {device_id} 没有匹配到已启用 App: {names}")
         device = replace(device, apps=apps)
-    registry = create_default_registry()
-    if any(app.app_id == "wechat" for app in device.apps):
-        from wechat_automation.config import WechatSettings, load_wechat_settings
-        from wechat_automation.plugin import WechatPlugin
-
-        runtime_path = Path(config_path).resolve()
-        wechat_path = runtime_path.with_name("wechat.local.json")
-        wechat_settings = (
-            load_wechat_settings(wechat_path)
-            if wechat_path.exists()
-            else WechatSettings(runtime_config=runtime_path)
-        )
-        registry.register(WechatPlugin(wechat_settings))
+    registry = create_configured_registry(
+        config_path,
+        (app.app_id for app in device.apps if app.enabled),
+    )
     return DeviceWorker(settings, device, registry).run(once=once)
 
 
@@ -142,9 +133,12 @@ class DeviceWorker:
                 try:
                     while True:
                         self._run_cycle()
+                        self.session.close()
                         if once:
                             return 0
                         self.clock.sleep(self.settings.loop_interval_seconds)
+                        if not self.session.connect():
+                            return 2
                 finally:
                     self.session.close()
         except DeviceBusyError as error:
@@ -293,6 +287,8 @@ class DeviceWorker:
                 executor.suspend(context, job.execution, request)
                 job.suspended = True
                 current_index = self._handle_interruption(jobs, current_index, request)
+
+        issue_count += self._finish_cycle(jobs, trace_id)
         cycle_status = "success"
         cycle_level = EventLevel.INFO
         if issue_count:
@@ -306,6 +302,42 @@ class DeviceWorker:
             level=cycle_level,
             status=cycle_status,
         )
+
+    def _finish_cycle(self, jobs: list[_AppJob], trace_id: str) -> int:
+        """停止本轮应用并锁屏；失败只计为一处收尾异常。"""
+
+        failed: list[str] = []
+        stopped = 0
+        packages: set[str] = set()
+        for job in jobs:
+            app = job.plugin.spec.identity
+            if app.package_name in packages:
+                continue
+            packages.add(app.package_name)
+            result = self.session.stop_app(app)
+            if result.succeeded:
+                stopped += 1
+            else:
+                failed.append(app.display_name)
+
+        locked = self.session.press(SystemKey.SLEEP)
+        if not locked.succeeded:
+            failed.append("锁屏")
+
+        status = "success" if not failed else "partial"
+        level = EventLevel.INFO if not failed else EventLevel.WARNING
+        message = f"已停止 {stopped} 个应用并锁屏"
+        if failed:
+            message = f"轮次收尾未完全成功: {'、'.join(failed)}"
+        self._emit_worker_event(
+            trace_id,
+            "runtime.cycle.cleanup.finished",
+            "轮次收尾",
+            message,
+            level=level,
+            status=status,
+        )
+        return int(bool(failed))
 
     def _create_context(
         self,
@@ -326,7 +358,6 @@ class DeviceWorker:
             events=self.events,
             diagnostics=diagnostics,
             diagnostic_failure_threshold=self.settings.diagnostics.consecutive_failure_threshold,
-            diagnostic_capture_interval=self.settings.diagnostics.capture_every_failures,
             cycle_id=trace_id,
             app_run_id=uuid4().hex,
             business_date=getattr(self, "_cycle_business_date", None),

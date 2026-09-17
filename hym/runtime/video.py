@@ -445,7 +445,7 @@ class VideoContentTask:
     def _run_interactions(self, context: AppContext) -> None:
         interaction = self.spec.interaction
         if interaction.follow_target is not None and context.random.random() < float(
-            context.option("follow_probability", 0.011)
+            context.option("follow_probability", 0.002)
         ):
             context.actions.tap_target(interaction.follow_target, timeout=0.8)
         if interaction.like_target is not None and context.random.random() < float(
