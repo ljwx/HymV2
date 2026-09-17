@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping
@@ -142,6 +143,34 @@ class LoggingSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class ReportingSettings:
+    """运行数据批量上报；密钥默认从环境变量读取，避免写入仓库。"""
+
+    enabled: bool = False
+    server_url: str = ""
+    ingest_key: str = ""
+    level: str = "info"
+    batch_size: int = 100
+    timeout_seconds: float = 10.0
+    retry_interval_seconds: float = 30.0
+    upload_artifacts: bool = True
+
+    def __post_init__(self) -> None:
+        if self.enabled and not self.server_url.startswith(("http://", "https://")):
+            raise ValueError("上报服务器地址必须以 http:// 或 https:// 开头")
+        if self.enabled and not self.ingest_key:
+            raise ValueError("启用运行数据上报时必须提供上报密钥")
+        if self.level not in {"debug", "info", "warning", "error"}:
+            raise ValueError("上报日志级别无效")
+        if not 1 <= self.batch_size <= 500:
+            raise ValueError("单批上报数量必须位于 1 到 500 之间")
+        if self.timeout_seconds <= 0:
+            raise ValueError("上报超时时间必须大于零")
+        if self.retry_interval_seconds < 0:
+            raise ValueError("上报重试间隔不能小于零")
+
+
+@dataclass(frozen=True, slots=True)
 class ProcessSettings:
     monitor_interval_seconds: float = 2.0
     restart_limit: int = 3
@@ -222,6 +251,7 @@ class RuntimeSettings:
     retry: RetrySettings
     vision: VisionSettings
     logging: LoggingSettings
+    reporting: ReportingSettings
     processes: ProcessSettings
     diagnostics: DiagnosticsSettings
     devices: tuple[DeviceRunSettings, ...]
@@ -230,6 +260,7 @@ class RuntimeSettings:
     state_dir: Path = Path("runtime/state")
     artifact_dir: Path = Path("runtime/artifacts")
     resource_dir: Path = Path("resource")
+    report_queue_dir: Path = Path("runtime/report_queue")
     loop_interval_seconds: float = 10.0
 
     def behavior_for(self, device: DeviceRunSettings, app: AppRunSettings) -> BehaviorSettings:
@@ -247,6 +278,11 @@ def load_runtime_settings(path: str | Path) -> RuntimeSettings:
     retry = RetrySettings(**raw.get("retry", {}))
     vision = VisionSettings(**raw.get("vision", {}))
     logging = LoggingSettings(**raw.get("logging", {}))
+    reporting_values = dict(raw.get("reporting", {}))
+    ingest_key_env = str(reporting_values.pop("ingest_key_env", "JDCR_AUTOMATION_INGEST_KEY"))
+    if not reporting_values.get("ingest_key"):
+        reporting_values["ingest_key"] = os.environ.get(ingest_key_env, "")
+    reporting = ReportingSettings(**reporting_values)
     processes = ProcessSettings(**raw.get("processes", {}))
     diagnostics = DiagnosticsSettings(**raw.get("diagnostics", {}))
     interruption_values = dict(raw.get("interruptions", {}))
@@ -275,6 +311,7 @@ def load_runtime_settings(path: str | Path) -> RuntimeSettings:
         retry=retry,
         vision=vision,
         logging=logging,
+        reporting=reporting,
         processes=processes,
         diagnostics=diagnostics,
         devices=devices,
@@ -283,6 +320,7 @@ def load_runtime_settings(path: str | Path) -> RuntimeSettings:
         state_dir=_resolve_path(base_dir, paths.get("state", "runtime/state")),
         artifact_dir=_resolve_path(base_dir, paths.get("artifacts", "runtime/artifacts")),
         resource_dir=_resolve_path(base_dir, paths.get("resources", "resource")),
+        report_queue_dir=_resolve_path(base_dir, paths.get("report_queue", "runtime/report_queue")),
         loop_interval_seconds=loop_interval,
     )
 

@@ -42,6 +42,16 @@
     "write_jsonl": true,
     "jsonl_level": "info"
   },
+  "reporting": {
+    "enabled": false,
+    "server_url": "http://127.0.0.1:8080",
+    "ingest_key_env": "JDCR_AUTOMATION_INGEST_KEY",
+    "level": "info",
+    "batch_size": 100,
+    "timeout_seconds": 10.0,
+    "retry_interval_seconds": 30.0,
+    "upload_artifacts": true
+  },
   "processes": {
     "monitor_interval_seconds": 2.0,
     "restart_limit": 3
@@ -68,6 +78,7 @@
     "logs": "runtime/logs",
     "state": "runtime/state",
     "artifacts": "runtime/artifacts",
+    "report_queue": "runtime/report_queue",
     "resources": "resource"
   },
   "devices": [
@@ -284,6 +295,19 @@
             "launch_wait_seconds": 6.0,
             "stop_app_probability": 0.5,
             "skip_content": false
+          }
+        },
+        {
+          "app_id": "wechat",
+          "enabled": true,
+          "options": {
+            "daily_once": true,
+            "daily_window_start_hour": 9.0,
+            "daily_window_center_hour": 15.0,
+            "daily_window_end_hour": 22.0,
+            "daily_window_stddev_hours": 2.2,
+            "allow_interruptions": false,
+            "stop_app_probability": 0.0
           }
         }
       ]

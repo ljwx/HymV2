@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import hashlib
+import re
 
-from hym.core.models import AppIdentity, SystemKey, WorkflowResult, WorkflowStatus
+from hym.core.models import AppIdentity, OcrText, SystemKey, WorkflowResult, WorkflowStatus
 from hym.core.pages import ObservationProfile
 from hym.core.randomness import bounded_normal_int
 from hym.runtime.context import AppContext
@@ -134,8 +138,11 @@ class WechatPlugin:
         return StepOutcome.success("朋友圈浏览完成", swipe_count=count)
 
     def _capture_wallet(self, context: AppContext) -> StepOutcome:
-        if self.settings.wallet.capture_once_per_day and context.daily_value("wallet_capture") is not None:
-            return StepOutcome(WorkflowStatus.ALREADY_DONE, "今天已经记录过零钱页面")
+        recorded = context.daily_value("wallet_capture")
+        if self.settings.wallet.capture_once_per_day and _has_wallet_snapshot(recorded):
+            return StepOutcome(WorkflowStatus.ALREADY_DONE, "今天已经记录过微信零钱和账单")
+        if context.ocr is None:
+            return StepOutcome.failure("微信资产采集需要启用 OCR")
         if not self._go_home(context):
             return StepOutcome.failure("查看零钱时无法返回微信首页")
         if not context.actions.tap_target(targets.ME_TAB, timeout=1.5):
@@ -147,44 +154,97 @@ class WechatPlugin:
         if not context.actions.tap_target(targets.WALLET_ENTRY, timeout=2.0):
             return StepOutcome.failure("没有找到钱包入口")
         context.timing.wait(self.settings.page_wait_seconds)
-        if not context.actions.tap_target(targets.BALANCE_ENTRY, timeout=2.0):
-            return StepOutcome.failure("没有找到零钱入口")
-        context.timing.wait(self.settings.page_wait_seconds)
 
-        page_result = context.actions.match_page(targets.BALANCE_PAGE_SPEC)
-        observation = page_result.observation
-        if not page_result.matched or observation is None:
-            return StepOutcome.failure("进入后没有识别到零钱页面")
-        artifacts = context.diagnostics.capture(
-            "wechat-wallet",
-            observation,
-            metadata={
-                "schema_version": "1.0",
-                "purpose": "微信零钱页面记录",
-                "trace_id": context.trace_id,
-                "device_id": context.device_id,
-            },
-        )
-        if not artifacts:
-            return StepOutcome.failure("零钱页面已打开，但截图和页面结构保存失败")
-        context.mark_daily("wallet_capture", {"artifacts": [item.uri for item in artifacts]})
+        observation = context.actions.observe(include_ui_tree=False, include_screenshot=True)
+        if observation is None or observation.screenshot is None:
+            return StepOutcome.failure("微信钱包页面截图失败")
+        wallet_texts = context.ocr.recognize(observation.screenshot)
+        if not any(item.text.strip() == "钱包" for item in wallet_texts):
+            return StepOutcome.failure("进入后没有识别到微信钱包页面")
+        balance_minor = _wallet_balance_minor(wallet_texts)
+        if balance_minor is None:
+            return StepOutcome.failure("没有识别到微信零钱总额")
+
+        balance = {
+            "asset_key": "cash",
+            "asset_label": "零钱",
+            "amount_minor": balance_minor,
+            "scale": 2,
+            "unit": "元",
+        }
+        wallet_data = {
+            "business_date": context.business_date.isoformat(),
+            "balances": [balance],
+        }
         context.emit(
-            "wechat.wallet.captured",
-            "零钱页面记录",
-            "微信零钱页面已保存到本地诊断目录",
+            "wechat.wallet.snapshot",
+            "微信零钱记录",
+            "微信零钱总额已记录",
             workflow_id="wechat_activity",
             step_id="查看零钱",
             status="success",
-            data={"artifact_count": len(artifacts)},
-            artifacts=artifacts,
+            data=wallet_data,
+        )
+
+        if not context.actions.tap_target(targets.BILL_ENTRY, timeout=2.0):
+            return StepOutcome.failure("没有找到微信账单入口")
+        context.timing.wait(self.settings.page_wait_seconds)
+        transactions = self._read_transactions(context)
+        if not transactions:
+            return StepOutcome.failure("没有识别到微信账单交易")
+        bill_data = {
+            "business_date": context.business_date.isoformat(),
+            "transactions": transactions,
+        }
+        context.emit(
+            "wechat.bill.snapshot",
+            "微信账单记录",
+            f"微信最近账单已记录 {len(transactions)} 笔",
+            workflow_id="wechat_activity",
+            step_id="查看零钱",
+            status="success",
+            data=bill_data,
+        )
+        context.mark_daily(
+            "wallet_capture",
+            {
+                **wallet_data,
+                "transaction_count": len(transactions),
+            },
         )
         context.actions.press(SystemKey.BACK)
-        return StepOutcome(
-            WorkflowStatus.SUCCESS,
-            "零钱页面记录完成",
-            {"artifact_count": len(artifacts)},
-            artifacts,
+        context.actions.press(SystemKey.BACK)
+        return StepOutcome.success(
+            "微信零钱和账单记录完成",
+            balance_minor=balance_minor,
+            transaction_count=len(transactions),
         )
+
+    def _read_transactions(self, context: AppContext) -> list[dict[str, object]]:
+        assert context.ocr is not None
+        settings = self.settings.wallet
+        found: dict[str, dict[str, object]] = {}
+        current_year: int | None = None
+        for page in range(settings.max_bill_pages):
+            observation = context.actions.observe(include_ui_tree=False, include_screenshot=True)
+            if observation is None or observation.screenshot is None:
+                break
+            texts = context.ocr.recognize(observation.screenshot)
+            if page == 0 and not any(item.text.strip() == "账单" for item in texts):
+                return []
+            page_items, current_year = _bill_transactions(
+                texts,
+                current_year=current_year,
+                timezone=context.timing.clock.now().astimezone().tzinfo,
+            )
+            for item in page_items:
+                found.setdefault(str(item["fingerprint"]), item)
+                if len(found) >= settings.transaction_limit:
+                    return list(found.values())[: settings.transaction_limit]
+            if page + 1 >= settings.max_bill_pages or not context.actions.swipe_up():
+                break
+            context.timing.wait(self.settings.page_wait_seconds)
+        return list(found.values())[: settings.transaction_limit]
 
     def _chat(self, context: AppContext) -> StepOutcome:
         chat = self.settings.chat
@@ -276,3 +336,112 @@ class WechatPlugin:
                 stddev=stddev,
             )
         )
+
+
+_AMOUNT_RE = re.compile(r"^([+-])\s*[¥￥]?\s*(\d[\d,]*(?:\.\d{1,2})?)$")
+_DATE_RE = re.compile(r"(\d{1,2})月(\d{1,2})日\s*(\d{1,2})[:.](\d{2})")
+_MONTH_RE = re.compile(r"(\d{4})年\s*(\d{1,2})月")
+
+
+def _has_wallet_snapshot(recorded: object) -> bool:
+    if not isinstance(recorded, dict):
+        return False
+    value = recorded.get("value")
+    return isinstance(value, dict) and bool(value.get("balances")) and int(value.get("transaction_count", 0)) > 0
+
+
+def _wallet_balance_minor(texts: tuple[OcrText, ...]) -> int | None:
+    for item in sorted(texts, key=lambda value: value.bounds.top):
+        if item.bounds.top > 0.30:
+            continue
+        match = re.search(r"[¥￥]\s*(\d[\d,]*(?:\.\d{1,2})?)", item.text)
+        if match is not None:
+            return _decimal_minor(match.group(1), 2)
+    return None
+
+
+def _bill_transactions(
+    texts: tuple[OcrText, ...],
+    *,
+    current_year: int | None,
+    timezone,
+) -> tuple[list[dict[str, object]], int | None]:
+    ordered = sorted(texts, key=lambda item: (item.bounds.top, item.bounds.left))
+    headers = [
+        (item.bounds.top, int(match.group(1)))
+        for item in ordered
+        if (match := _MONTH_RE.search(item.text.replace(" ", ""))) is not None
+    ]
+    transactions: list[dict[str, object]] = []
+    for amount_item in ordered:
+        compact_amount = amount_item.text.replace(" ", "")
+        amount_match = _AMOUNT_RE.fullmatch(compact_amount)
+        if amount_match is None or amount_item.bounds.left < 0.70 or amount_item.bounds.top < 0.24:
+            continue
+        year = current_year
+        for header_top, header_year in headers:
+            if header_top <= amount_item.bounds.top:
+                year = header_year
+            else:
+                break
+        if year is None:
+            continue
+        title = next(
+            (
+                item.text.strip()
+                for item in ordered
+                if item.bounds.left < 0.72
+                and abs(item.bounds.top - amount_item.bounds.top) <= 0.025
+                and item is not amount_item
+                and not _MONTH_RE.search(item.text)
+            ),
+            "",
+        )
+        date_item = next(
+            (
+                item
+                for item in ordered
+                if amount_item.bounds.top + 0.015 <= item.bounds.top <= amount_item.bounds.top + 0.075
+                and _DATE_RE.search(item.text.replace(" ", "")) is not None
+            ),
+            None,
+        )
+        if not title or date_item is None:
+            continue
+        date_match = _DATE_RE.search(date_item.text.replace(" ", ""))
+        assert date_match is not None
+        month, day, hour, minute = map(int, date_match.groups())
+        try:
+            occurred = datetime(year, month, day, hour, minute, tzinfo=timezone)
+        except ValueError:
+            continue
+        amount_minor = _decimal_minor(amount_match.group(2), 2)
+        if amount_minor is None:
+            continue
+        direction = "income" if amount_match.group(1) == "+" else "expense"
+        occurred_text = f"{year:04d}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}"
+        fingerprint_source = "|".join(
+            (title, occurred_text, direction, str(amount_minor), "CNY")
+        )
+        transactions.append(
+            {
+                "fingerprint": hashlib.sha256(fingerprint_source.encode("utf-8")).hexdigest(),
+                "title": title,
+                "occurred_at_text": occurred_text,
+                "occurred_at_ms": round(occurred.timestamp() * 1000),
+                "amount_minor": amount_minor,
+                "scale": 2,
+                "currency": "CNY",
+                "direction": direction,
+            }
+        )
+    latest_year = headers[-1][1] if headers else current_year
+    return transactions, latest_year
+
+
+def _decimal_minor(value: str, scale: int) -> int | None:
+    try:
+        number = Decimal(value.replace(",", ""))
+        return int((number * (Decimal(10) ** scale)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    except InvalidOperation:
+        return None

@@ -29,6 +29,7 @@ class NavigationSpec:
     page_wait_seconds: float = 4.0
     home_attempts: int = 5
     reselect_home_tab: bool = True
+    visual_task_to_home_recovery: bool = False
     transient_activity_patterns: tuple[str, ...] = ()
     home_page: PageSpec | None = None
     task_page: PageSpec | None = None
@@ -81,8 +82,26 @@ class CheckInSpec:
 
 
 @dataclass(frozen=True, slots=True)
+class BalanceAssetSpec:
+    """声明一个可独立展示和比较的余额字段。"""
+
+    asset_key: str
+    asset_label: str
+    target: TargetSpec
+    scale: int = 0
+    unit: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.asset_key or not self.asset_label:
+            raise ValueError("余额字段标识和名称不能为空")
+        if not 0 <= self.scale <= 6:
+            raise ValueError("余额小数位必须位于 0 到 6 之间")
+
+
+@dataclass(frozen=True, slots=True)
 class BalanceSpec:
-    balance_target: TargetSpec
+    balance_target: TargetSpec | None = None
+    assets: tuple[BalanceAssetSpec, ...] = ()
     enter_target: TargetSpec | None = None
     page_marker: TargetSpec | None = None
     screenshot_only: bool = False
@@ -91,6 +110,11 @@ class BalanceSpec:
     enter_wait_seconds: float | None = None
 
     def __post_init__(self) -> None:
+        if self.balance_target is None and not self.assets:
+            raise ValueError("余额流程至少需要一个定位目标")
+        keys = [asset.asset_key for asset in self.assets]
+        if len(keys) != len(set(keys)):
+            raise ValueError("余额字段标识不能重复")
         if self.enter_wait_seconds is not None and self.enter_wait_seconds < 0:
             raise ValueError("余额页面等待时间不能小于零")
 

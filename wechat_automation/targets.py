@@ -152,6 +152,24 @@ BALANCE_PAGE_SPEC = PageSpec(
     (BALANCE_PAGE,),
 )
 
+WALLET_PAGE = _target(
+    "微信钱包页面",
+    _ocr_locator("OCR标题", "钱包", region=TOP, min_confidence=0.4),
+    required=False,
+)
+WALLET_PAGE_SPEC = PageSpec("wechat.wallet", WECHAT_PACKAGE, (WALLET_PAGE,))
+BILL_ENTRY = _target(
+    "微信账单入口",
+    _ocr_locator("OCR文字", "账单", region=Rect(0.78, 0.04, 1.0, 0.14), min_confidence=0.4),
+    _coordinate_locator("已校准右上角位置", 0.92, 0.09),
+)
+BILL_PAGE = _target(
+    "微信账单页面",
+    _ocr_locator("OCR标题", "账单", region=TOP, min_confidence=0.4),
+    required=False,
+)
+BILL_PAGE_SPEC = PageSpec("wechat.bill", WECHAT_PACKAGE, (BILL_PAGE,))
+
 SEARCH_ENTRY = _target(
     "微信搜索入口",
     _desc_locator("描述", "搜索", priority=10, region=TOP),

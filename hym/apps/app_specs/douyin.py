@@ -14,7 +14,7 @@
 - “去签到”和旧版“进度条”只负责打开下一层，不算领取；“主动签到/立即签到领”才是提交动作。
 - 命中“已签到N天”或“打开签到提醒按钮”才确认完成。提交后状态不明时当天不重复领取。
 - 余额每天只成功记录一次。当前节点只适合截图留证，尚未稳定解析出余额文字。
-- 时段奖励匹配“开宝箱得金币”，兼容到账提示和“获得开宝箱奖励”弹窗，可继续看奖励广告。
+- 时段奖励匹配“开宝箱得金币”或右下角“领N”，兼容到账提示和“获得开宝箱奖励”弹窗，可继续看奖励广告。
 - 刷视频时先分类广告、长视频和普通视频；明确广告只短暂停留且禁止互动。
 - 当前普通视频标记覆盖不足，未分类内容按普通观看节奏浏览且不互动，不直接当成疑似广告。
 - 普通视频约 8% 快速划过、25% 尝试完整观看，其余按常规时长观看；所有比例和时长可独立配置。
@@ -24,11 +24,12 @@
 页面与状态标记：
 - 首页：root_view + user_avatar/viewpager，且不能出现任务页标记；首页标签：“首页”。
 - 已确认处于视频流时不重复点击“首页”，避免在单视频和视频列表之间切换。
-- 任务入口：描述“福袋”，兼容图片和底栏结构；任务页：“每天都能领金币”/
-  “已签到N天”/标题“赚钱任务”。
+- 任务入口：描述“福袋”，兼容图片、底栏结构和底部“赚钱”OCR；任务页：“每天都能领金币”/
+  “已签到N天”/标题“赚钱任务”/新版签到或看视频任务描述。
 - 视频广告：“当前直播间可用”/“广告”/“查看详情”/“立即下载”。
 - 普通视频：“全屏观看”或“拍同款”；长视频：“点击进入看全集”/“听抖音”/“合集”。
-- 激励广告：“N秒后可领奖励”；连续广告按“领取成功，关闭”后再匹配“下一个广告”。
+- 激励广告入口只在右侧出现“去观看”时点击；播放页使用
+  `ExcitingVideoActivity` 或“N秒后可领奖励”，进入应用详情页后返回并优先选择“坚持退出”。
 
 待持续校准：页面结构和文案变化时优先在对应标记组增加新分支；不能因为某一次页面成立，
 就删除仍可能出现的旧版签到和广告分支。
@@ -41,6 +42,7 @@ from hym.apps.plugin import ComposedAppPlugin, create_daily_plugin
 from hym.apps.specs import (
     AdSpec,
     AppSpec,
+    BalanceAssetSpec,
     BalanceSpec,
     CheckInSpec,
     CheckInStageSpec,
@@ -50,6 +52,7 @@ from hym.apps.specs import (
     VideoContentSpec,
 )
 from hym.apps.targets import (
+    activity_locator,
     desc_locator,
     id_locator,
     image_locator,
@@ -71,17 +74,42 @@ def douyin_spec() -> AppSpec:
 
     # 首页、任务页和视频流标记；同一 target 内可继续追加新版 ID 或文案作为备选
     home_marker = target("抖音首页标记", id_locator("首页根节点", prefix + "root_view"), required=True)
-    home_tab = text_target("抖音首页标签", "首页", required=True)
+    home_tab = target(
+        "抖音首页标签",
+        text_locator("首页底部文本", "首页", region=Rect(0.0, 0.90, 0.25, 1.0)),
+        ocr_locator(
+            "首页底部OCR",
+            "首页",
+            mode="exact",
+            region=Rect(0.0, 0.90, 0.25, 1.0),
+            confidence=0.45,
+        ),
+        required=True,
+    )
     task_entry = target(
         "抖音任务入口",
         desc_locator("福袋描述", "福袋"),
         image_locator("任务标签图片", "douyin/main_task_tab.png"),
         layout_locator("福袋结构", FRAME, position=(0.5, 0.9438), size=(0.2033, 0.0730)),
+        ocr_locator(
+            "赚钱入口OCR",
+            "赚钱",
+            mode="exact",
+            region=Rect(0.38, 0.90, 0.62, 1.0),
+            confidence=0.45,
+            priority=20,
+        ),
         required=True,
     )
     task_marker = target(
         "抖音任务页标记",
         desc_locator("每日金币描述", "每天都能领金币"),
+        regex_locator(
+            "新版任务内容描述",
+            r".*(?:签到|看视频).*(?:金币|赚钱).*",
+            priority=20,
+            region=Rect(0.05, 0.15, 0.95, 0.75),
+        ),
         regex_locator("已签到描述", r"已签到[1-9]\d*天", priority=21),
         ocr_locator(
             "赚钱任务标题OCR",
@@ -100,16 +128,75 @@ def douyin_spec() -> AppSpec:
     )
 
     # 激励广告可能连续出现，依次处理关闭提示和“下一个广告”入口
-    close_ad = target("抖音广告关闭", desc_locator("关闭描述", "领取成功，关闭，按钮"))
+    close_ad = target(
+        "抖音广告关闭",
+        desc_locator("关闭描述", "领取成功，关闭，按钮"),
+        ocr_locator(
+            "领取成功OCR",
+            "领取成功",
+            mode="exact",
+            region=Rect(0.68, 0.04, 0.98, 0.16),
+            confidence=0.45,
+        ),
+    )
+    ad_landing = target(
+        "抖音广告落地页",
+        activity_locator(
+            "广告落地页Activity",
+            r"SifContainerActivity$",
+            package_name=package_name,
+        ),
+    )
+    app_detail_landing = target(
+        "抖音广告应用详情页",
+        text_locator("应用权限文本", "应用权限"),
+        ocr_locator(
+            "应用权限OCR",
+            "应用权限",
+            mode="exact",
+            region=Rect(0.25, 0.10, 0.75, 0.22),
+            confidence=0.45,
+        ),
+    )
+    ad_exit_prompt_close = target(
+        "抖音广告退出弹窗关闭",
+        layout_locator(
+            "退出弹窗右上角关闭结构",
+            IMAGE,
+            position=(0.8033, 0.3741),
+            size=(0.065, 0.0292),
+            position_tolerance=0.04,
+            size_tolerance=0.04,
+        ),
+    )
+    persist_exit = target(
+        "抖音广告坚持退出",
+        text_locator("坚持退出文本", "坚持退出"),
+        ocr_locator(
+            "坚持退出OCR",
+            "坚持退出",
+            mode="exact",
+            region=Rect(0.15, 0.35, 0.85, 0.80),
+            confidence=0.45,
+        ),
+    )
     ad = AdSpec(
         start_markers=(
+            target(
+                "抖音激励广告页面",
+                activity_locator(
+                    "激励广告Activity",
+                    r"ExcitingVideoActivity$",
+                    package_name=package_name,
+                ),
+            ),
             target(
                 "抖音广告倒计时",
                 text_locator("倒计时文本", "秒后可领奖励", contains=True),
                 ocr_locator("倒计时OCR", "秒后可领奖励"),
             ),
         ),
-        completion_markers=(close_ad,),
+        completion_markers=(close_ad, ad_landing, app_detail_landing),
         continue_targets=(target("抖音广告返回", id_locator("广告返回ID", prefix + "iv_back")),),
         next_sequences=((
             close_ad,
@@ -119,9 +206,12 @@ def douyin_spec() -> AppSpec:
                 layout_locator("下一个广告结构", GROUP, position=(0.5, 0.4632), size=(0.7583, 0.3928)),
             ),
         ),),
-        close_targets=(close_ad,),
-        final_close_targets=(close_ad,),
+        close_targets=(close_ad, persist_exit, ad_exit_prompt_close),
+        final_close_targets=(close_ad, persist_exit, ad_exit_prompt_close),
         exit_targets=(task_marker, home_marker),
+        exit_after_wait_with_back=True,
+        exit_prompt_markers=(persist_exit, ad_exit_prompt_close),
+        exit_prompt_close_targets=(persist_exit, ad_exit_prompt_close),
     )
 
     return AppSpec(
@@ -133,6 +223,7 @@ def douyin_spec() -> AppSpec:
             task_entry,
             task_marker,
             reselect_home_tab=False,
+            visual_task_to_home_recovery=True,
             home_page=PageSpec(
                 "douyin.home",
                 package_name,
@@ -211,6 +302,13 @@ def douyin_spec() -> AppSpec:
                     "抖音签到成功",
                     regex_locator("已签到天数", r"已签到[1-9]\d*天"),
                     desc_locator("旧版签到提醒描述", "打开签到提醒按钮", priority=21),
+                    ocr_locator(
+                        "新人签到完成OCR",
+                        "明天领",
+                        mode="contains",
+                        region=Rect(0.15, 0.55, 0.85, 0.85),
+                        confidence=0.45,
+                    ),
                     required=True,
                 ),
             ),
@@ -218,20 +316,53 @@ def douyin_spec() -> AppSpec:
             max_transitions=4,
         ),
 
-        # 该区域目前无法稳定提取文字，因此每天保存一次页面截图作为余额证据
+        # 金币和现金各自限定在顶部账户区域，避免把下方任务奖励数字当成余额。
         balance=BalanceSpec(
-            balance_target=target(
-                "抖音余额区域",
-                layout_locator("余额区域结构", GROUP, position=(0.5, 0.1794), size=(0.915, 0.1389)),
-                required=True,
+            assets=(
+                BalanceAssetSpec(
+                    "coin",
+                    "金币",
+                    target(
+                        "抖音金币余额",
+                        ocr_locator(
+                            "顶部金币数字OCR",
+                            r"\d[\d,]*",
+                            mode="regex",
+                            region=Rect(0.05, 0.16, 0.40, 0.23),
+                            confidence=0.45,
+                        ),
+                    ),
+                    unit="金币",
+                ),
+                BalanceAssetSpec(
+                    "cash",
+                    "现金",
+                    target(
+                        "抖音现金余额",
+                        ocr_locator(
+                            "顶部现金数字OCR",
+                            r"\d+(?:\.\d+)?",
+                            mode="regex",
+                            region=Rect(0.46, 0.16, 0.72, 0.23),
+                            confidence=0.45,
+                        ),
+                    ),
+                    scale=2,
+                    unit="元",
+                ),
             ),
-            screenshot_only=True,
         ),
         ad=ad,
         duration_reward=DurationRewardSpec(
             reward_target=target(
                 "抖音时段奖励",
                 desc_locator("开宝箱描述", "开宝箱得金币"),
+                regex_locator(
+                    "当前宝箱领取描述",
+                    r"领\d+",
+                    priority=21,
+                    region=Rect(0.72, 0.85, 1.0, 1.0),
+                ),
             ),
             success_target=target(
                 "抖音奖励到账",
@@ -311,6 +442,14 @@ def douyin_spec() -> AppSpec:
         ),
         ad_entry=target(
             "抖音广告任务入口",
+            ocr_locator(
+                "广告去观看OCR",
+                "去观看",
+                mode="exact",
+                region=Rect(0.72, 0.12, 1.0, 0.90),
+                confidence=0.45,
+                priority=10,
+            ),
             desc_locator("广告任务描述", "分钟完成一次"),
             text_locator("广告任务文本", "分钟完成一次", contains=True),
             ocr_locator("广告任务OCR", "分钟完成一次"),

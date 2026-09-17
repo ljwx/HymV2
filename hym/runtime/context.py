@@ -11,7 +11,7 @@ from hym.core.config import AppRunSettings
 from hym.core.events import AutomationEvent, EventLevel
 from hym.core.models import AppIdentity, ArtifactRef
 from hym.core.pages import ObservationProfile
-from hym.core.ports import EventSinkPort, RandomPort, StateStorePort
+from hym.core.ports import EventSinkPort, OcrEnginePort, RandomPort, StateStorePort
 from hym.core.randomness import bounded_normal_int
 from hym.core.targets import ResolveResult
 from hym.runtime.behavior import BehaviorTiming
@@ -49,6 +49,7 @@ class AppContext:
         app_run_id: str | None = None,
         business_date: date | None = None,
         observation_profile: ObservationProfile | None = None,
+        ocr: OcrEnginePort | None = None,
     ) -> None:
         self.app = app
         self.settings = settings
@@ -68,6 +69,7 @@ class AppContext:
         self.trace_id = self.app_run_id
         self.step_run_id: str | None = None
         self.observation_profile = observation_profile or ObservationProfile()
+        self.ocr = ocr
         self._actions: ActionController | None = None
         self.recent_locator_attempts: deque[dict[str, Any]] = deque(maxlen=50)
         self.runtime_progress: dict[str, dict[str, Any]] = {}

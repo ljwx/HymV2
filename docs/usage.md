@@ -138,6 +138,36 @@ rg 'workflow.finished|workflow.suspended|runtime.interruption|diagnostic.thresho
 
 同一设备不能同时运行普通任务和微信任务。后启动的进程会输出 `runtime.device.busy` 并退出，避免两个 Poco 会话交叉点击。
 
+## 上报到 JDCR Server
+
+运行数据默认只写本地。需要在 JDCR KMP App 中查看时，开启顶层 `reporting`：
+
+```json
+{
+  "reporting": {
+    "enabled": true,
+    "server_url": "http://192.168.1.10:8080",
+    "ingest_key_env": "JDCR_AUTOMATION_INGEST_KEY",
+    "level": "info",
+    "batch_size": 100,
+    "timeout_seconds": 10.0,
+    "retry_interval_seconds": 30.0,
+    "upload_artifacts": true
+  }
+}
+```
+
+启动前在当前终端设置 Server 使用的同一写入密钥：
+
+```bash
+export JDCR_AUTOMATION_INGEST_KEY="服务端上报密钥"
+.venv/bin/python -m hym --once
+```
+
+写入密钥只用于上报，不能读取 Server 数据，也不要直接写进配置文件。事件先追加到 `runtime/report_queue/<设备ID>.jsonl`，达到 `batch_size` 或本轮结束时批量发送。网络失败、服务不可用或证据上传失败不会中断 App 任务，本地队列会保留；失败后至少等待 `retry_interval_seconds` 才再试，避免断网时每条事件都消耗超时。事件以 `event_id` 去重。
+
+`upload_artifacts` 开启后，达到重复失败阈值产生的截图、UI 树和执行上下文会跟随事件上传。正常流程不会为上报额外截图。Android App 登录同一 Server 后，从“设置 > 数据 > 运行中心”查看今天或近 7 天的数据。“执行”页在一屏内展示总用时、完成步数、每分钟效率、异常、各 App 余额和执行记录；“微信资产”页展示零钱和最近 10 笔去重账单。从第二个业务日起，余额行会显示“较昨日”；中间日期缺失时显示“较上次”。
+
 ## 趣头条
 
 趣头条使用独立新闻工作流，包括随机文章、随机阅读到底部、点赞和查看评论，不发布评论。签到、余额和随机文章已有真机成功记录；最新整轮发现的两类广告 SDK Activity 已加入广告开始标记，待设备重连后复验退出链路。旧目录中的趣头条代码不会被新入口导入。

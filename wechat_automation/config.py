@@ -39,6 +39,14 @@ class MomentsSettings:
 class WalletSettings:
     enabled: bool = True
     capture_once_per_day: bool = True
+    transaction_limit: int = 10
+    max_bill_pages: int = 3
+
+    def __post_init__(self) -> None:
+        if not 1 <= self.transaction_limit <= 30:
+            raise ValueError("微信账单记录条数必须位于 1 到 30 之间")
+        if not 1 <= self.max_bill_pages <= 5:
+            raise ValueError("微信账单最多翻页次数必须位于 1 到 5 之间")
 
 
 @dataclass(frozen=True, slots=True)

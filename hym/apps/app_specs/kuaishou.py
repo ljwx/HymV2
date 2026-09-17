@@ -11,7 +11,7 @@
 
 任务与限制：
 - 签到每天最多完成一次。当前可执行入口是“立即签到”，成功标记为“查看日历”/
-  “已签到N/N天”/旧版“明日签到可领”。提交后状态不明时当天不重复点击。
+  “已签到N/N天”/“N金币待领取，继续看视频得金币”/旧版“明日签到可领”。提交后状态不明时当天不重复点击。
 - “连续打卡白拿手机/去领取”属于另一种 365 天活动，当前不能当成每日签到入口。
 - 签到完成后如果出现“去看视频”，可继续处理奖励广告，然后关闭任务弹窗。
 - 余额从“我的金币”进入“我的收益”，每天只留一次截图证据；当前尚未稳定解析余额文字。
@@ -24,7 +24,7 @@
 - 未开启疑似广告策略的 App 才按未分类视频保守浏览，默认不互动。
 
 页面与状态标记：
-- 首页：同时命中 bottom_bar_container 和“首页”；任务入口：“去赚钱”；任务页：“任务中心”。
+- 首页：同时命中 bottom_bar_container 和“首页”；任务入口：“去赚钱”，树为空时用底部 OCR 兜底；任务页：“任务中心”。
 - 启动关闭：close_btn；邀请弹窗：“邀请2个新用户必得”；返回拦截：“离开”。
 - 视频流：follow_avatar_view，兼容直播预览 layout_root_hot_live_play。
 - 广告视频：ad_download_progress / slide_play_right_link_icon / ad_card_container_root /
@@ -44,6 +44,7 @@ from hym.apps.plugin import ComposedAppPlugin, create_daily_plugin
 from hym.apps.specs import (
     AdSpec,
     AppSpec,
+    BalanceAssetSpec,
     BalanceSpec,
     CheckInSpec,
     CheckInStageSpec,
@@ -194,6 +195,14 @@ def kuaishou_spec() -> AppSpec:
                 "快手任务入口",
                 text_locator("任务底部文本", "去赚钱", region=Rect(0.55, 0.90, 0.85, 1.0)),
                 desc_locator("任务底部描述", "去赚钱"),
+                ocr_locator(
+                    "任务底部OCR",
+                    "去赚钱",
+                    mode="exact",
+                    region=Rect(0.55, 0.90, 0.85, 1.0),
+                    confidence=0.45,
+                    priority=20,
+                ),
                 required=True,
                 metadata={"ui_tree_source": tree_source},
             ),
@@ -282,7 +291,13 @@ def kuaishou_spec() -> AppSpec:
                     "快手签到成功",
                     text_locator("签到日历按钮", "查看日历"),
                     regex_locator("签到完成天数", r"已签到[1-9]\d*/\d+天", priority=21),
-                    text_locator("旧版签到状态", "明日签到可领", priority=22),
+                    regex_locator(
+                        "连续看视频签到完成",
+                        r"\d+金币待领取，继续看视频得金币",
+                        priority=22,
+                        region=Rect(0.05, 0.25, 0.95, 0.60),
+                    ),
+                    text_locator("旧版签到状态", "明日签到可领", priority=23),
                     required=True,
                     metadata={"ui_tree_source": tree_source},
                 ),
@@ -295,34 +310,43 @@ def kuaishou_spec() -> AppSpec:
             close_target=task_close,
         ),
 
-        # 余额成功后写入当天状态；目前保留截图，不把任意数字误报成真实余额
+        # 任务页顶部左右分别是金币和现金，两个字段都命中后才写入当天状态。
         balance=BalanceSpec(
-            enter_target=text_target(
-                "快手金币入口",
-                "我的金币",
-                ui_tree_source=tree_source,
-            ),
-            page_marker=text_target(
-                "快手收益页",
-                "我的收益",
-                ui_tree_source=tree_source,
-            ),
-            balance_target=target(
-                "快手余额",
-                regex_locator("余额文本", r"\d+(?:\.\d+)?", region=Rect(0.05, 0.12, 0.35, 0.26)),
-                layout_locator("余额结构", TEXT, position=(0.1908, 0.1898), size=(0.23, 0.0486)),
-                ocr_locator(
-                    "余额OCR",
-                    r"\d+(?:\.\d+)?",
-                    mode="regex",
-                    region=Rect(0.05, 0.12, 0.35, 0.26),
+            assets=(
+                BalanceAssetSpec(
+                    "coin",
+                    "金币",
+                    target(
+                        "快手金币余额",
+                        ocr_locator(
+                            "顶部金币数字OCR",
+                            r"\d[\d,]*",
+                            mode="regex",
+                            region=Rect(0.05, 0.17, 0.35, 0.23),
+                            confidence=0.45,
+                        ),
+                        metadata={"ui_tree_source": tree_source},
+                    ),
+                    unit="金币",
                 ),
-                required=True,
-                metadata={"ui_tree_source": tree_source},
+                BalanceAssetSpec(
+                    "cash",
+                    "现金",
+                    target(
+                        "快手现金余额",
+                        ocr_locator(
+                            "顶部现金数字OCR",
+                            r"\d+(?:\.\d+)?",
+                            mode="regex",
+                            region=Rect(0.52, 0.17, 0.82, 0.23),
+                            confidence=0.30,
+                        ),
+                        metadata={"ui_tree_source": tree_source},
+                    ),
+                    scale=2,
+                    unit="元",
+                ),
             ),
-            screenshot_only=True,
-            close_with_back=True,
-            enter_wait_seconds=4.0,
         ),
         ad=ad,
         duration_reward=DurationRewardSpec(

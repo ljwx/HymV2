@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from hym.adapters.airtest_poco import AirtestPocoDeviceFactory
 from hym.adapters.local import AtomicJsonStateStore, LocalArtifactStore, SystemClock, SystemRandomSource
+from hym.adapters.reporting import DurableHttpEventSink
 from hym.apps.registry import AppPlugin, AppRegistry, create_default_registry
 from hym.core.config import AppRunSettings, DeviceRunSettings, RuntimeSettings, load_runtime_settings
 from hym.core.events import (
@@ -36,6 +37,7 @@ from hym.runtime.interruption import (
     WorkflowYield,
 )
 from hym.runtime.lease import DeviceBusyError, DeviceLease
+from hym.runtime.schedule import DailyAppScheduler
 from hym.runtime.session import DeviceSession
 from hym.runtime.workflow import WorkflowExecution, WorkflowExecutor
 
@@ -57,7 +59,20 @@ def run_device_from_config(
             names = "、".join(sorted(selected))
             raise ValueError(f"设备 {device_id} 没有匹配到已启用 App: {names}")
         device = replace(device, apps=apps)
-    return DeviceWorker(settings, device, create_default_registry()).run(once=once)
+    registry = create_default_registry()
+    if any(app.app_id == "wechat" for app in device.apps):
+        from wechat_automation.config import WechatSettings, load_wechat_settings
+        from wechat_automation.plugin import WechatPlugin
+
+        runtime_path = Path(config_path).resolve()
+        wechat_path = runtime_path.with_name("wechat.local.json")
+        wechat_settings = (
+            load_wechat_settings(wechat_path)
+            if wechat_path.exists()
+            else WechatSettings(runtime_config=runtime_path)
+        )
+        registry.register(WechatPlugin(wechat_settings))
+    return DeviceWorker(settings, device, registry).run(once=once)
 
 
 @dataclass(slots=True)
@@ -98,15 +113,21 @@ class DeviceWorker:
         )
         self.state = AtomicJsonStateStore(settings.state_dir / f"{_safe_id(device.descriptor.device_id)}.json")
         self.artifacts = LocalArtifactStore(settings.artifact_dir / _safe_id(device.descriptor.device_id))
+        self.scheduler = DailyAppScheduler(
+            device.descriptor.device_id,
+            self.state,
+            self.clock,
+            self.random,
+        )
         image_matcher = OpenCvTemplateMatcher(settings.resource_dir) if settings.vision.enable_image_matching else None
-        ocr_engine = (
+        self.ocr = (
             create_ocr_engine(settings.vision.ocr_engine, settings.vision.ocr_language)
             if settings.vision.enable_ocr
             else None
         )
         self.locator = locator or HybridLocator(
             self.random,
-            ocr_engine=ocr_engine,
+            ocr_engine=self.ocr,
             image_matcher=image_matcher,
         )
         self.lease = DeviceLease(
@@ -160,6 +181,9 @@ class DeviceWorker:
         for app_settings in self.device_settings.apps:
             if not app_settings.enabled:
                 continue
+            scheduler = getattr(self, "scheduler", None)
+            if scheduler is not None and not scheduler.is_due(app_settings.app_id, app_settings.options):
+                continue
             plugin = self.registry.get(app_settings.app_id)
             if plugin is None:
                 self._emit_worker_event(
@@ -196,6 +220,9 @@ class DeviceWorker:
             context = job.context
             if not job.started:
                 job.started = True
+                scheduler = getattr(self, "scheduler", None)
+                if scheduler is not None:
+                    scheduler.mark_started(job.settings.app_id, job.settings.options)
                 context.emit(
                     "app.started",
                     "应用任务开始",
@@ -308,6 +335,7 @@ class DeviceWorker:
                 "observation_profile",
                 ObservationProfile(),
             ),
+            ocr=self.ocr,
         )
         context.actions = ActionController(context, self.locator)
         return context
@@ -429,6 +457,23 @@ class DeviceWorker:
                 JsonlEventSink(
                     self.settings.log_dir / f"{device_id}.jsonl",
                     EventFilter(min_level=EventLevel(self.settings.logging.jsonl_level)),
+                )
+            )
+        if self.settings.reporting.enabled:
+            apps = tuple(
+                plugin.spec.identity
+                for app_id in self.registry.app_ids()
+                if (plugin := self.registry.get(app_id)) is not None
+            )
+            sinks.append(
+                DurableHttpEventSink(
+                    self.settings.reporting,
+                    self.settings.report_queue_dir / f"{device_id}.jsonl",
+                    self.device_settings.descriptor,
+                    apps,
+                    event_filter=EventFilter(
+                        min_level=EventLevel(self.settings.reporting.level)
+                    ),
                 )
             )
         return CompositeEventSink(sinks)

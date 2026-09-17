@@ -62,6 +62,7 @@ class NavigationController:
         relaunched = False
         hard_restarted = False
         home_tab_attempted = False
+        visual_task_recovery_attempted = False
         unexpected_activity = ""
         unexpected_activity_count = 0
         logged_transient_activities: set[str] = set()
@@ -163,6 +164,25 @@ class NavigationController:
                             home_tab_attempted = True
                             context.timing.operation_delay()
                             continue
+            if (
+                navigation.visual_task_to_home_recovery
+                and not visual_task_recovery_attempted
+                and navigation.task_page is not None
+            ):
+                visual_task_recovery_attempted = True
+                task_result = context.actions.match_page(navigation.task_page)
+                if task_result.matched:
+                    context.actions.press(SystemKey.BACK)
+                    context.emit(
+                        "navigation.task.home_selected",
+                        "任务页返回首页",
+                        f"已从{self.spec.display_name}任务页切回首页",
+                        workflow_id="daily",
+                        status="success",
+                        data={"method": "back"},
+                    )
+                    context.timing.operation_delay()
+                    return True
             context.actions.press(SystemKey.BACK)
             context.timing.operation_delay()
         return False

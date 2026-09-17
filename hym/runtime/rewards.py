@@ -3,8 +3,9 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from hym.apps.specs import AppSpec, CheckInSpec, CheckInStageSpec
+from hym.apps.specs import AppSpec, BalanceAssetSpec, CheckInSpec, CheckInStageSpec
 from hym.core.events import EventLevel
 from hym.core.models import Observation, SystemKey, WorkflowStatus
 from hym.core.targets import ResolveResult, TargetSpec
@@ -211,7 +212,8 @@ class BalanceTask:
     go_task_page: TaskPageNavigator
 
     def run(self, context: AppContext) -> StepOutcome:
-        if context.daily_value("balance") is not None:
+        recorded = context.daily_value("balance")
+        if _has_structured_balance(recorded):
             return StepOutcome(WorkflowStatus.ALREADY_DONE, "今天已经记录过余额")
         spec = self.app_spec.balance
         if spec is None:
@@ -231,6 +233,10 @@ class BalanceTask:
         ):
             return StepOutcome.failure("进入余额页面后没有找到页面标记")
 
+        if spec.assets:
+            return self._record_assets(context, spec.assets, spec.close_with_back)
+
+        assert spec.balance_target is not None
         result = context.actions.resolve(spec.balance_target, timeout=3.0)
         if not result.found or result.target is None:
             return StepOutcome.failure("没有识别到余额区域")
@@ -250,7 +256,7 @@ class BalanceTask:
             workflow_id="daily",
             step_id="记录余额",
             status="success",
-            data={"value": value},
+            data={"business_date": context.business_date.isoformat(), "value": value},
             artifacts=artifacts,
         )
         if spec.close_with_back:
@@ -261,6 +267,89 @@ class BalanceTask:
             {"value": value},
             artifacts,
         )
+
+    def _record_assets(
+        self,
+        context: AppContext,
+        assets: tuple[BalanceAssetSpec, ...],
+        close_with_back: bool,
+    ) -> StepOutcome:
+        observation = context.actions.observe_for(
+            tuple(asset.target for asset in assets),
+            include_screenshot=True,
+        )
+        if observation is None or observation.screenshot is None:
+            return StepOutcome.failure("余额页面截图失败")
+
+        values: list[dict[str, object]] = []
+        missing: list[str] = []
+        for asset in assets:
+            result = context.actions.resolve_in(asset.target, observation)
+            evidence = result.target.evidence if result.found and result.target is not None else None
+            amount_minor = _amount_minor(evidence, asset.scale)
+            if amount_minor is None:
+                missing.append(asset.asset_label)
+                continue
+            values.append(
+                {
+                    "asset_key": asset.asset_key,
+                    "asset_label": asset.asset_label,
+                    "amount_minor": amount_minor,
+                    "scale": asset.scale,
+                    "unit": asset.unit,
+                }
+            )
+        if missing:
+            return StepOutcome.failure(f"没有识别到余额字段: {'、'.join(missing)}")
+
+        data = {
+            "business_date": context.business_date.isoformat(),
+            "balances": values,
+        }
+        context.mark_daily("balance", data)
+        summary = "，".join(
+            f"{item['asset_label']} {_format_minor(int(item['amount_minor']), int(item['scale']))}{item['unit']}"
+            for item in values
+        )
+        context.emit(
+            "reward.balance.recorded",
+            "余额记录完成",
+            f"今日余额已记录: {summary}",
+            workflow_id="daily",
+            step_id="记录余额",
+            status="success",
+            data=data,
+        )
+        if close_with_back:
+            context.actions.press(SystemKey.BACK)
+        return StepOutcome.success("余额记录完成", balances=values)
+
+
+def _has_structured_balance(recorded: object) -> bool:
+    if not isinstance(recorded, dict):
+        return False
+    value = recorded.get("value")
+    return isinstance(value, dict) and bool(value.get("balances"))
+
+
+def _amount_minor(value: str | None, scale: int) -> int | None:
+    if not value:
+        return None
+    match = re.search(r"[-+]?\s*\d[\d,]*(?:\.\d+)?", value)
+    if match is None:
+        return None
+    try:
+        amount = Decimal(match.group(0).replace(" ", "").replace(",", ""))
+        factor = Decimal(10) ** scale
+        return int((amount * factor).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    except InvalidOperation:
+        return None
+
+
+def _format_minor(value: int, scale: int) -> str:
+    if scale <= 0:
+        return str(value)
+    return f"{Decimal(value) / (Decimal(10) ** scale):.{scale}f}"
 
 
 @dataclass(frozen=True, slots=True)

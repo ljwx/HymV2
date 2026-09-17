@@ -4,14 +4,14 @@ from types import SimpleNamespace
 
 from hym.core.config import AppRunSettings, BehaviorSettings
 from hym.core.events import InMemoryEventSink
-from hym.core.models import ActivityInfo, AppIdentity, DeviceDescriptor, Observation, Point, WorkflowStatus
+from hym.core.models import ActivityInfo, AppIdentity, DeviceDescriptor, Observation, OcrText, Point, Rect, WorkflowStatus
 from hym.core.pages import PageMatchResult, PageMatchStatus
 from hym.core.targets import ResolveResult, ResolveStatus, ResolvedTarget
 from hym.runtime.behavior import BehaviorTiming
 from hym.runtime.context import AppContext
 from hym.testing import DeterministicRandom, FakeClock, InMemoryStateStore
 from wechat_automation.config import ChatSettings, MomentsSettings, WalletSettings, WechatSettings
-from wechat_automation.plugin import WechatPlugin
+from wechat_automation.plugin import WechatPlugin, _bill_transactions, _wallet_balance_minor
 
 
 class StubSession:
@@ -89,6 +89,28 @@ def create_context():
 
 
 class WechatPluginTest(unittest.TestCase):
+    def test_wallet_ocr_builds_balance_and_deduplicatable_bill_rows(self):
+        texts = (
+            OcrText("钱包", Rect(0.4, 0.07, 0.6, 0.10), 1.0, "test"),
+            OcrText("¥476.47", Rect(0.7, 0.14, 0.9, 0.17), 1.0, "test"),
+        )
+        bill_texts = (
+            OcrText("账单", Rect(0.4, 0.07, 0.6, 0.10), 1.0, "test"),
+            OcrText("2022年12月", Rect(0.04, 0.21, 0.30, 0.24), 1.0, "test"),
+            OcrText("商家转账-来自快手科技", Rect(0.2, 0.28, 0.7, 0.31), 1.0, "test"),
+            OcrText("+0.30", Rect(0.84, 0.28, 0.96, 0.31), 1.0, "test"),
+            OcrText("12月8日 13.23", Rect(0.2, 0.32, 0.5, 0.34), 1.0, "test"),
+        )
+
+        transactions, year = _bill_transactions(bill_texts, current_year=None, timezone=None)
+
+        self.assertEqual(47_647, _wallet_balance_minor(texts))
+        self.assertEqual(2022, year)
+        self.assertEqual(1, len(transactions))
+        self.assertEqual(30, transactions[0]["amount_minor"])
+        self.assertEqual("income", transactions[0]["direction"])
+        self.assertEqual(64, len(str(transactions[0]["fingerprint"])))
+
     def test_home_recovery_checks_after_all_configured_back_presses(self):
         class RecoveryActions:
             def __init__(self):

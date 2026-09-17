@@ -143,6 +143,66 @@ class AppSpecLayoutTest(unittest.TestCase):
         self.assertEqual("广告福利按钮文本", spec.ad_entry.locators[0].strategy_id)
         self.assertEqual("领福利", spec.ad_entry.locators[0].query)
 
+    def test_kuaishou_task_entry_has_visual_fallback(self):
+        spec = kuaishou_spec()
+
+        self.assertIn(
+            "任务底部OCR",
+            {locator.strategy_id for locator in spec.navigation.task_entry.locators},
+        )
+
+    def test_kuaishou_supports_video_streak_check_in_result(self):
+        spec = kuaishou_spec()
+
+        self.assertIn(
+            "连续看视频签到完成",
+            {
+                locator.strategy_id
+                for locator in spec.check_in.success_targets[0].locators
+            },
+        )
+
+    def test_douyin_supports_the_newcomer_task_page(self):
+        spec = douyin_spec()
+        task_entry_strategies = {
+            locator.strategy_id for locator in spec.navigation.task_entry.locators
+        }
+        task_marker_strategies = {
+            locator.strategy_id for locator in spec.navigation.task_marker.locators
+        }
+        sign_in_strategies = {
+            locator.strategy_id for locator in spec.check_in.success_targets[0].locators
+        }
+        reward_strategies = {
+            locator.strategy_id for locator in spec.duration_reward.reward_target.locators
+        }
+        ad_entry_strategies = {
+            locator.strategy_id for locator in spec.ad_entry.locators
+        }
+        completion_targets = {
+            target.target_id for target in spec.ad.completion_markers
+        }
+        exit_prompt_targets = {
+            target.target_id for target in spec.ad.exit_prompt_close_targets
+        }
+        final_close_targets = {
+            target.target_id for target in spec.ad.final_close_targets
+        }
+
+        self.assertIn("赚钱入口OCR", task_entry_strategies)
+        self.assertIn("新版任务内容描述", task_marker_strategies)
+        self.assertIn("新人签到完成OCR", sign_in_strategies)
+        self.assertIn("当前宝箱领取描述", reward_strategies)
+        self.assertIn("广告去观看OCR", ad_entry_strategies)
+        self.assertIn("抖音广告落地页", completion_targets)
+        self.assertIn("抖音广告应用详情页", completion_targets)
+        self.assertIn("抖音广告退出弹窗关闭", exit_prompt_targets)
+        self.assertIn("抖音广告坚持退出", final_close_targets)
+        self.assertEqual(
+            "抖音广告坚持退出",
+            spec.ad.exit_prompt_close_targets[0].target_id,
+        )
+
     def test_registry_rejects_cross_app_target_id_collision(self):
         first_spec = kuaishou_spec()
         second_spec = replace(

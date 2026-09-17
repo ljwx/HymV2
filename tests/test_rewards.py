@@ -43,16 +43,13 @@ def context(actions):
 
 
 class RewardTaskTest(unittest.TestCase):
-    def test_balance_uses_app_specific_page_wait(self):
+    def test_kuaishou_balance_reads_both_assets_from_task_page(self):
         spec = kuaishou_spec()
-        actions = StubActions(page_exists=False)
-        current = context(actions)
+        balance = spec.balance
 
-        outcome = BalanceTask(spec, lambda _: True).run(current)
-
-        self.assertEqual(WorkflowStatus.RETRYABLE_FAILURE, outcome.status)
-        self.assertEqual([4.0], current.timing.waits)
-        self.assertEqual(0, current.timing.operation_delays)
+        self.assertIsNotNone(balance)
+        self.assertIsNone(balance.enter_target)
+        self.assertEqual(["coin", "cash"], [asset.asset_key for asset in balance.assets])
 
     def test_duration_reward_cleans_popup_after_unconfirmed_result(self):
         spec = kuaishou_spec()
