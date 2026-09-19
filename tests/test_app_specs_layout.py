@@ -4,10 +4,25 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 from hym.apps import catalog
-from hym.apps.app_specs import douyin_spec, kuaishou_spec, qutoutiao_spec, ximalaya_spec
+from hym.apps.app_specs import (
+    baidu_lite_spec,
+    douyin_spec,
+    fanqie_audio_spec,
+    fanqie_novel_spec,
+    kuaishou_spec,
+    qutoutiao_spec,
+    toutiao_lite_spec,
+    wukong_browser_spec,
+    ximalaya_spec,
+)
+from hym.apps.app_specs.baidu_lite import create_plugin as create_baidu_lite_plugin
 from hym.apps.app_specs.douyin import create_plugin as create_douyin_plugin
+from hym.apps.app_specs.fanqie_audio import create_plugin as create_fanqie_audio_plugin
+from hym.apps.app_specs.fanqie_novel import create_plugin as create_fanqie_novel_plugin
 from hym.apps.app_specs.kuaishou import create_plugin as create_kuaishou_plugin
 from hym.apps.app_specs.qutoutiao import create_plugin as create_qutoutiao_plugin
+from hym.apps.app_specs.toutiao_lite import create_plugin as create_toutiao_lite_plugin
+from hym.apps.app_specs.wukong_browser import create_plugin as create_wukong_browser_plugin
 from hym.apps.app_specs.ximalaya import create_plugin as create_ximalaya_plugin
 from hym.apps.plugin import (
     ComposedAppPlugin,
@@ -28,6 +43,11 @@ class AppSpecLayoutTest(unittest.TestCase):
             (douyin_spec, "hym.apps.app_specs.douyin"),
             (qutoutiao_spec, "hym.apps.app_specs.qutoutiao"),
             (ximalaya_spec, "hym.apps.app_specs.ximalaya"),
+            (fanqie_novel_spec, "hym.apps.app_specs.fanqie_novel"),
+            (toutiao_lite_spec, "hym.apps.app_specs.toutiao_lite"),
+            (fanqie_audio_spec, "hym.apps.app_specs.fanqie_audio"),
+            (baidu_lite_spec, "hym.apps.app_specs.baidu_lite"),
+            (wukong_browser_spec, "hym.apps.app_specs.wukong_browser"),
         )
 
         for factory, module_name in factories:
@@ -43,6 +63,11 @@ class AppSpecLayoutTest(unittest.TestCase):
         self.assertIs(catalog.douyin_spec, douyin_spec)
         self.assertIs(catalog.qutoutiao_spec, qutoutiao_spec)
         self.assertIs(catalog.ximalaya_spec, ximalaya_spec)
+        self.assertIs(catalog.fanqie_novel_spec, fanqie_novel_spec)
+        self.assertIs(catalog.toutiao_lite_spec, toutiao_lite_spec)
+        self.assertIs(catalog.fanqie_audio_spec, fanqie_audio_spec)
+        self.assertIs(catalog.baidu_lite_spec, baidu_lite_spec)
+        self.assertIs(catalog.wukong_browser_spec, wukong_browser_spec)
 
     def test_each_app_owns_its_plugin_factory(self):
         factories = (
@@ -50,6 +75,11 @@ class AppSpecLayoutTest(unittest.TestCase):
             (create_douyin_plugin, "douyin"),
             (create_qutoutiao_plugin, "qutoutiao"),
             (create_ximalaya_plugin, "ximalaya"),
+            (create_fanqie_novel_plugin, "fanqie_novel"),
+            (create_toutiao_lite_plugin, "toutiao_lite"),
+            (create_fanqie_audio_plugin, "fanqie_audio"),
+            (create_baidu_lite_plugin, "baidu_lite"),
+            (create_wukong_browser_plugin, "wukong_browser"),
         )
 
         for factory, app_id in factories:
@@ -137,9 +167,48 @@ class AppSpecLayoutTest(unittest.TestCase):
 
     def test_default_specs_have_globally_unique_target_ids(self):
         self.assertEqual(
-            ("kuaishou", "douyin", "qutoutiao", "ximalaya"),
+            (
+                "kuaishou",
+                "douyin",
+                "qutoutiao",
+                "ximalaya",
+                "fanqie_novel",
+                "toutiao_lite",
+                "fanqie_audio",
+                "baidu_lite",
+                "wukong_browser",
+            ),
             create_default_registry().app_ids(),
         )
+
+    def test_fanqie_audio_stops_only_after_balance_fallback(self):
+        context = SimpleNamespace(
+            option=lambda key, default: default,
+            random=SimpleNamespace(random=lambda: 0.0, randint=lambda start, end: start),
+        )
+
+        steps = create_fanqie_audio_plugin().build_workflow(context).steps
+
+        self.assertEqual("余额兜底记录", steps[-3].step_id)
+        self.assertEqual("更新提现信息", steps[-2].step_id)
+        self.assertEqual("停止应用", steps[-1].step_id)
+
+    def test_wukong_task_entry_uses_bottom_bar_instead_of_video_overlay(self):
+        navigation = wukong_browser_spec().navigation
+        home_strategies = {item.strategy_id for item in navigation.home_tab.locators}
+        task_strategies = {item.strategy_id for item in navigation.task_entry.locators}
+
+        self.assertNotIn("底栏赚钱入口坐标", home_strategies)
+        self.assertIn("底栏赚钱入口坐标", task_strategies)
+        self.assertTrue(navigation.reselect_home_tab)
+        self.assertFalse(navigation.select_home_tab_before_task)
+        self.assertEqual("wukong_browser.main", navigation.home_page.page_id)
+
+    def test_baidu_task_entry_does_not_reselect_video_tab(self):
+        navigation = baidu_lite_spec().navigation
+
+        self.assertFalse(navigation.select_home_tab_before_task)
+        self.assertEqual("baidu_lite.main", navigation.home_page.page_id)
 
     def test_kuaishou_home_rejects_pages_that_only_keep_bottom_bar(self):
         spec = kuaishou_spec()
@@ -157,6 +226,15 @@ class AppSpecLayoutTest(unittest.TestCase):
 
         self.assertEqual("广告福利按钮文本", spec.ad_entry.locators[0].strategy_id)
         self.assertEqual("领福利", spec.ad_entry.locators[0].query)
+
+    def test_fanqie_novel_does_not_treat_generic_claim_as_ad_entry(self):
+        spec = fanqie_novel_spec()
+
+        self.assertEqual(1, len(spec.ad_entry.locators))
+        self.assertEqual(
+            "看视频赚金币",
+            spec.ad_entry.locators[0].options["contains_text"],
+        )
 
     def test_kuaishou_task_entry_has_visual_fallback(self):
         spec = kuaishou_spec()

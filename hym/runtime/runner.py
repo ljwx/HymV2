@@ -1,35 +1,38 @@
 from __future__ import annotations
 
-import traceback
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from uuid import uuid4
 
 from hym.adapters.airtest_poco import AirtestPocoDeviceFactory
+from hym.adapters.control import HttpRemoteControlClient
 from hym.adapters.local import AtomicJsonStateStore, LocalArtifactStore, SystemClock, SystemRandomSource
-from hym.adapters.reporting import DurableHttpEventSink
 from hym.apps.registry import AppPlugin, AppRegistry, create_configured_registry
 from hym.core.config import AppRunSettings, DeviceRunSettings, RuntimeSettings, load_runtime_settings
+from hym.core.control import TaskScope
 from hym.core.events import (
     AutomationEvent,
-    CompositeEventSink,
-    ConsoleEventSink,
-    EventFilter,
     EventLevel,
-    JsonlEventSink,
 )
-from hym.core.models import SystemKey
-from hym.core.models import WorkflowStatus
+from hym.core.models import SystemKey, WorkflowStatus
 from hym.core.pages import ObservationProfile
-from hym.core.ports import DeviceFactoryPort, LocatorPort
+from hym.core.ports import DeviceFactoryPort, LocatorPort, RemoteControlPort
 from hym.core.randomness import bounded_normal
 from hym.locators.hybrid import HybridLocator
 from hym.locators.vision import OpenCvTemplateMatcher, create_ocr_engine
 from hym.runtime.actions import ActionController
 from hym.runtime.behavior import BehaviorTiming
 from hym.runtime.context import AppContext
+from hym.runtime.control import DeviceControlRuntime, RemoteControlCoordinator
+from hym.runtime.cycle_support import (
+    finish_cycle,
+    next_pending_index,
+    record_unhandled_app_error,
+    rest_before_next_app,
+)
 from hym.runtime.diagnostics import DiagnosticsService
+from hym.runtime.event_setup import create_worker_event_sink, safe_id
 from hym.runtime.interruption import (
     InterruptionKind,
     InterruptionPolicy,
@@ -88,13 +91,14 @@ class DeviceWorker:
         *,
         device_factory: DeviceFactoryPort | None = None,
         locator: LocatorPort | None = None,
+        remote_control: RemoteControlPort | None = None,
     ) -> None:
         self.settings = settings
         self.device_settings = device
         self.registry = registry
         self.clock = SystemClock()
         self.random = SystemRandomSource()
-        self.events = self._create_events()
+        self.events = create_worker_event_sink(settings, device, registry)
         self.session = DeviceSession(
             device.descriptor,
             device_factory or AirtestPocoDeviceFactory(),
@@ -102,8 +106,8 @@ class DeviceWorker:
             self.clock,
             settings.retry,
         )
-        self.state = AtomicJsonStateStore(settings.state_dir / f"{_safe_id(device.descriptor.device_id)}.json")
-        self.artifacts = LocalArtifactStore(settings.artifact_dir / _safe_id(device.descriptor.device_id))
+        self.state = AtomicJsonStateStore(settings.state_dir / f"{safe_id(device.descriptor.device_id)}.json")
+        self.artifacts = LocalArtifactStore(settings.artifact_dir / safe_id(device.descriptor.device_id))
         self.scheduler = DailyAppScheduler(
             device.descriptor.device_id,
             self.state,
@@ -122,25 +126,75 @@ class DeviceWorker:
             image_matcher=image_matcher,
         )
         self.lease = DeviceLease(
-            settings.state_dir / ".locks" / f"{_safe_id(device.descriptor.device_id)}.lock"
+            settings.state_dir / ".locks" / f"{safe_id(device.descriptor.device_id)}.lock"
+        )
+        control_port = remote_control
+        if control_port is None and settings.reporting.enabled and settings.reporting.control_enabled:
+            control_port = HttpRemoteControlClient(settings.reporting)
+        self.remote_control = (
+            RemoteControlCoordinator(
+                control_port,
+                device.descriptor.device_id,
+                self.clock,
+                settings.reporting.control_poll_interval_seconds,
+                settings.reporting.retry_interval_seconds,
+            )
+            if control_port is not None
+            else None
+        )
+        self.remote_runtime = (
+            DeviceControlRuntime(self.remote_control, self._emit_worker_event)
+            if self.remote_control is not None
+            else None
         )
 
     def run(self, *, once: bool) -> int:
         try:
             with self.lease:
-                if not self.session.connect():
-                    return 2
-                try:
-                    while True:
+                if once:
+                    if not self.session.connect():
+                        return 2
+                    try:
                         self._run_cycle()
+                        return 0
+                    finally:
                         self.session.close()
-                        if once:
-                            return 0
-                        self.clock.sleep(self.settings.loop_interval_seconds)
+
+                next_cycle_at = self.clock.now().timestamp()
+                while True:
+                    trace_id = uuid4().hex
+                    pause = self.remote_runtime.poll_pause() if self.remote_runtime else None
+                    if pause is not None:
+                        self.remote_runtime.wait(pause, trace_id=trace_id)
+                        continue
+
+                    command = self.remote_runtime.claim_command() if self.remote_runtime else None
+                    if command is not None:
+                        self.remote_runtime.run_command(
+                            command,
+                            session=self.session,
+                            run_cycle=self._run_cycle,
+                            loop_interval_seconds=self.settings.loop_interval_seconds,
+                        )
+                        continue
+
+                    now = self.clock.now().timestamp()
+                    if now >= next_cycle_at:
                         if not self.session.connect():
                             return 2
-                finally:
-                    self.session.close()
+                        try:
+                            self._run_cycle()
+                        finally:
+                            self.session.close()
+                        next_cycle_at = self.clock.now().timestamp() + self.settings.loop_interval_seconds
+                        continue
+
+                    poll_seconds = (
+                        self.settings.reporting.control_poll_interval_seconds
+                        if self.remote_runtime is not None
+                        else self.settings.loop_interval_seconds
+                    )
+                    self.clock.sleep(min(poll_seconds, max(0.0, next_cycle_at - now)))
         except DeviceBusyError as error:
             trace_id = uuid4().hex
             self._emit_worker_event(
@@ -153,7 +207,14 @@ class DeviceWorker:
             )
             return 3
 
-    def _run_cycle(self) -> None:
+    def _run_cycle(
+        self,
+        *,
+        app_ids: set[str] | None = None,
+        task_scope: TaskScope = TaskScope.FULL,
+        force: bool = False,
+        sequential: bool = False,
+    ) -> str:
         trace_id = uuid4().hex
         self._cycle_business_date = self.clock.now().astimezone().date()
         self._emit_worker_event(
@@ -175,8 +236,14 @@ class DeviceWorker:
         for app_settings in self.device_settings.apps:
             if not app_settings.enabled:
                 continue
+            if app_ids is not None and app_settings.app_id not in app_ids:
+                continue
             scheduler = getattr(self, "scheduler", None)
-            if scheduler is not None and not scheduler.is_due(app_settings.app_id, app_settings.options):
+            if (
+                not force
+                and scheduler is not None
+                and not scheduler.is_due(app_settings.app_id, app_settings.options)
+            ):
                 continue
             plugin = self.registry.get(app_settings.app_id)
             if plugin is None:
@@ -191,10 +258,35 @@ class DeviceWorker:
                 )
                 issue_count += 1
                 continue
+            if task_scope is TaskScope.AD_REWARD:
+                app_settings = replace(
+                    app_settings,
+                    options={**app_settings.options, "execute_ad_probability": 1.0},
+                )
             context = self._create_context(trace_id, app_settings, plugin)
-            if bool(context.option("allow_interruptions", True)):
-                context.safe_point_handler = interruption_policy.yield_if_requested
-            definition = plugin.build_workflow(context)
+            allow_random_interruption = (
+                not sequential and bool(context.option("allow_interruptions", True))
+            )
+            remote_runtime = getattr(self, "remote_runtime", None)
+            if remote_runtime is not None or allow_random_interruption:
+                context.safe_point_handler = (
+                    lambda checkpoint, data, current=context, allow_random=allow_random_interruption:
+                    remote_runtime.yield_at_safe_point(
+                        current, interruption_policy, checkpoint, data, allow_random=allow_random
+                    ) if remote_runtime is not None else interruption_policy.yield_if_requested(checkpoint, data)
+                )
+            try:
+                definition = plugin.build_workflow(context).for_scope(task_scope)
+            except ValueError as error:
+                context.emit(
+                    "app.task.unsupported",
+                    "任务类型不支持",
+                    str(error),
+                    level=EventLevel.WARNING,
+                    status="skipped",
+                )
+                issue_count += 1
+                continue
             jobs.append(
                 _AppJob(
                     app_settings,
@@ -208,6 +300,16 @@ class DeviceWorker:
                 )
             )
 
+        if force and not jobs:
+            issue_count += 1
+            self._emit_worker_event(
+                trace_id,
+                "runtime.command.empty",
+                "控制任务无法执行",
+                "没有找到支持该任务范围的已启用应用",
+                level=EventLevel.ERROR,
+                status="failed",
+            )
         current_index = self._next_pending_index(jobs, -1)
         while current_index is not None:
             job = jobs[current_index]
@@ -244,8 +346,26 @@ class DeviceWorker:
                 issue_count += 1
                 job.completed = True
                 self._finish_app(context, job.plugin.spec.identity)
-                current_index = self._next_pending_index(jobs, current_index)
+                current_index = self._rest_before_next_app(jobs, current_index)
                 continue
+
+            remote_runtime = getattr(self, "remote_runtime", None)
+            pause_request = remote_runtime.pause_request(
+                "step.finished",
+                {
+                    "step_id": result.step_id if result is not None else None,
+                    "next_step_id": job.execution.next_step_id,
+                },
+                context=context,
+            ) if remote_runtime is not None else None
+            if pause_request is not None:
+                if job.execution.done:
+                    remote_runtime.wait(remote_runtime.state_from(pause_request), context=context)
+                else:
+                    executor.suspend(context, job.execution, pause_request)
+                    job.suspended = True
+                    current_index = self._handle_interruption(jobs, current_index, pause_request)
+                    continue
 
             if job.execution.done:
                 workflow_result = executor.finish(context, job.execution)
@@ -266,7 +386,7 @@ class DeviceWorker:
                     issue_count += 1
                 job.completed = True
                 self._finish_app(context, job.plugin.spec.identity)
-                current_index = self._next_pending_index(jobs, current_index)
+                current_index = self._rest_before_next_app(jobs, current_index)
                 continue
 
             definition = job.execution.definition.steps[job.execution.next_index - 1]
@@ -302,42 +422,10 @@ class DeviceWorker:
             level=cycle_level,
             status=cycle_status,
         )
+        return cycle_status
 
     def _finish_cycle(self, jobs: list[_AppJob], trace_id: str) -> int:
-        """停止本轮应用并锁屏；失败只计为一处收尾异常。"""
-
-        failed: list[str] = []
-        stopped = 0
-        packages: set[str] = set()
-        for job in jobs:
-            app = job.plugin.spec.identity
-            if app.package_name in packages:
-                continue
-            packages.add(app.package_name)
-            result = self.session.stop_app(app)
-            if result.succeeded:
-                stopped += 1
-            else:
-                failed.append(app.display_name)
-
-        locked = self.session.press(SystemKey.SLEEP)
-        if not locked.succeeded:
-            failed.append("锁屏")
-
-        status = "success" if not failed else "partial"
-        level = EventLevel.INFO if not failed else EventLevel.WARNING
-        message = f"已停止 {stopped} 个应用并锁屏"
-        if failed:
-            message = f"轮次收尾未完全成功: {'、'.join(failed)}"
-        self._emit_worker_event(
-            trace_id,
-            "runtime.cycle.cleanup.finished",
-            "轮次收尾",
-            message,
-            level=level,
-            status=status,
-        )
-        return int(bool(failed))
+        return finish_cycle(self.session, jobs, trace_id, self._emit_worker_event)
 
     def _create_context(
         self,
@@ -379,6 +467,11 @@ class DeviceWorker:
     ) -> int:
         job = jobs[current_index]
         context = job.context
+        if request.kind is InterruptionKind.USER_PAUSE:
+            remote_runtime = getattr(self, "remote_runtime", None)
+            if remote_runtime is not None:
+                remote_runtime.wait(remote_runtime.state_from(request), context=context)
+            return current_index
         candidates = [
             index
             for index, candidate in enumerate(jobs)
@@ -438,35 +531,10 @@ class DeviceWorker:
 
     @staticmethod
     def _next_pending_index(jobs: list[_AppJob], current_index: int) -> int | None:
-        for offset in range(1, len(jobs) + 1):
-            index = (current_index + offset) % len(jobs)
-            if not jobs[index].completed:
-                return index
-        return None
+        return next_pending_index(jobs, current_index)
 
     def _record_unhandled_app_error(self, job: _AppJob, error: Exception) -> None:
-        context = job.context
-        artifacts = context.diagnostics.capture(
-            f"{job.plugin.app_id}-unhandled",
-            metadata={
-                "schema_version": "1.0",
-                "trace_id": context.trace_id,
-                "device_id": context.device_id,
-                "app_id": context.app.app_id,
-                "message": str(error),
-                "traceback": traceback.format_exc(),
-                "recent_locator_attempts": list(context.recent_locator_attempts),
-            },
-        )
-        context.emit(
-            "app.failed",
-            "应用任务异常",
-            f"{job.plugin.spec.display_name}发生未处理异常: {error}",
-            level=EventLevel.ERROR,
-            status="failed",
-            data={"traceback": traceback.format_exc()},
-            artifacts=artifacts,
-        )
+        record_unhandled_app_error(job, error)
 
     def _finish_app(self, context: AppContext, app) -> None:
         stop_probability = float(context.option("stop_app_probability", 0.5))
@@ -476,38 +544,12 @@ class DeviceWorker:
         context.timing.operation_delay()
         context.session.stop_app(app)
 
-    def _create_events(self):
-        device_id = _safe_id(self.device_settings.descriptor.device_id)
-        sinks = [
-            ConsoleEventSink(
-                EventFilter(min_level=EventLevel(self.settings.logging.console_level))
-            ),
-        ]
-        if self.settings.logging.write_jsonl:
-            sinks.append(
-                JsonlEventSink(
-                    self.settings.log_dir / f"{device_id}.jsonl",
-                    EventFilter(min_level=EventLevel(self.settings.logging.jsonl_level)),
-                )
-            )
-        if self.settings.reporting.enabled:
-            apps = tuple(
-                plugin.spec.identity
-                for app_id in self.registry.app_ids()
-                if (plugin := self.registry.get(app_id)) is not None
-            )
-            sinks.append(
-                DurableHttpEventSink(
-                    self.settings.reporting,
-                    self.settings.report_queue_dir / f"{device_id}.jsonl",
-                    self.device_settings.descriptor,
-                    apps,
-                    event_filter=EventFilter(
-                        min_level=EventLevel(self.settings.reporting.level)
-                    ),
-                )
-            )
-        return CompositeEventSink(sinks)
+    def _rest_before_next_app(
+        self,
+        jobs: list[_AppJob],
+        current_index: int,
+    ) -> int | None:
+        return rest_before_next_app(self.clock, jobs, current_index)
 
     def _emit_worker_event(
         self,
@@ -533,7 +575,3 @@ class DeviceWorker:
                 app_id=app_id,
             )
         )
-
-
-def _safe_id(value: str) -> str:
-    return "".join(char if char.isalnum() or char in "-_." else "_" for char in value)

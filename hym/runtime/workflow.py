@@ -8,6 +8,7 @@ from typing import Any, Mapping
 from uuid import uuid4
 
 from hym.core.events import EventLevel
+from hym.core.control import TaskScope
 from hym.core.models import ArtifactRef, StepResult, WorkflowResult, WorkflowStatus
 from hym.runtime.context import AppContext
 from hym.runtime.interruption import InterruptionRequest, WorkflowYield
@@ -49,6 +50,7 @@ class StepDefinition:
     capture_on_failure: bool = True
     recovery: RecoveryHandler | None = None
     allow_interruption_after: bool = True
+    task_scope: TaskScope = TaskScope.FULL_ONLY
 
     def __post_init__(self) -> None:
         if self.max_attempts < 1:
@@ -60,6 +62,25 @@ class WorkflowDefinition:
     workflow_id: str
     display_name: str
     steps: tuple[StepDefinition, ...]
+
+    def for_scope(self, scope: TaskScope) -> WorkflowDefinition:
+        """保留启动/收尾步骤，只选择控制台要求的业务任务。"""
+
+        if scope is TaskScope.FULL:
+            return self
+        business = tuple(step for step in self.steps if step.task_scope is scope)
+        if not business:
+            raise ValueError(f"当前应用不支持{scope.display_name}")
+        selected = tuple(
+            step
+            for step in self.steps
+            if step.task_scope in {TaskScope.SETUP, scope, TaskScope.CLEANUP}
+        )
+        return WorkflowDefinition(
+            workflow_id=f"{self.workflow_id}:{scope.value}",
+            display_name=f"{self.display_name}·{scope.display_name}",
+            steps=selected,
+        )
 
 
 @dataclass(slots=True)

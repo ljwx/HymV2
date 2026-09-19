@@ -183,13 +183,18 @@ class AirtestPocoDeviceAdapter:
             # 一轮观察只采集一次 UI 树和截图，后续定位器共享结果。
             if request.include_ui_tree:
                 try:
-                    if request.ui_tree_source is UiTreeSource.ACCESSIBILITY:
+                    if request.ui_tree_source is UiTreeSource.SYSTEM:
                         ui_nodes = tuple(self._dump_accessibility_tree())
                     else:
                         hierarchy = self._manager.poco.dump()
                         ui_nodes = tuple(_flatten_hierarchy(hierarchy))
                 except Exception as error:
-                    warnings.append(f"UI 树获取失败: {error}")
+                    return ObservationResult(
+                        ActionStatus.FAILED,
+                        message=f"UI 树获取失败: {error}",
+                    )
+                if not ui_nodes:
+                    return ObservationResult(ActionStatus.FAILED, message="UI 树为空")
 
             if request.include_screenshot:
                 try:

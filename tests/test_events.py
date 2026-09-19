@@ -4,14 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from hym.core.events import (
-    AutomationEvent,
-    ConsoleEventSink,
-    EventFilter,
-    EventLevel,
-    JsonlEventSink,
-    to_jsonable,
-)
+from hym.adapters.events import ConsoleEventSink, JsonlEventSink
+from hym.core.events import AutomationEvent, EventFilter, EventLevel, to_jsonable
 
 
 class JsonlEventSinkTest(unittest.TestCase):

@@ -12,6 +12,7 @@ from hym.core.ports import ClockPort, RandomPort
 class InterruptionKind(str, Enum):
     APP_SWITCH = "app_switch"
     DESKTOP_PAUSE = "desktop_pause"
+    USER_PAUSE = "user_pause"
 
 
 @dataclass(frozen=True, slots=True)

@@ -4,6 +4,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from hym.apps.specs import AppSpec
+from hym.core.control import TaskScope
 from hym.runtime.context import AppContext
 from hym.runtime.navigation import NavigationController
 from hym.runtime.workflow import StepDefinition, StepOutcome, WorkflowDefinition
@@ -20,6 +21,7 @@ class DailyTaskSet:
     content: TaskHandler | None = None
     check_in: TaskHandler | None = None
     balance: TaskHandler | None = None
+    withdrawal: TaskHandler | None = None
     duration_reward: TaskHandler | None = None
     ad_reward: TaskHandler | None = None
 
@@ -32,6 +34,7 @@ class DailyWorkflowBuilder:
     navigation: NavigationController
     tasks: DailyTaskSet
     extra_steps: ExtraStepFactory | None = None
+    cleanup_steps: ExtraStepFactory | None = None
 
     def build(self, context: AppContext) -> WorkflowDefinition:
         steps = [
@@ -44,6 +47,7 @@ class DailyWorkflowBuilder:
                 continue_on_failure=False,
                 recovery=self.navigation.restart_app,
                 allow_interruption_after=False,
+                task_scope=TaskScope.SETUP,
             ),
             StepDefinition(
                 "处理启动弹窗",
@@ -51,9 +55,13 @@ class DailyWorkflowBuilder:
                 self._dismiss_launch,
                 capture_on_failure=False,
                 allow_interruption_after=False,
+                task_scope=TaskScope.SETUP,
             ),
         ]
         steps.extend(self.build_business_steps(context))
+        if self.cleanup_steps is not None:
+            # 清理步骤必须位于余额、提现等业务之后，例如停止后台音频。
+            steps.extend(self.cleanup_steps(context))
         return WorkflowDefinition(
             "daily",
             f"{self.spec.display_name}每日任务",
@@ -70,6 +78,7 @@ class DailyWorkflowBuilder:
                     self.tasks.content,
                     required=True,
                     recovery=self.navigation.recover_home,
+                    task_scope=TaskScope.MAIN,
                 )
             )
 
@@ -79,6 +88,7 @@ class DailyWorkflowBuilder:
                 "每日签到",
                 self.tasks.check_in,
                 recovery=self.navigation.recover_home,
+                task_scope=TaskScope.CHECK_IN,
             )
             first_probability = float(context.option("first_check_in_probability", 0.5))
             insert_at = 0 if context.random.random() < first_probability else len(items)
@@ -90,6 +100,7 @@ class DailyWorkflowBuilder:
                     "领取时段奖励",
                     self.tasks.duration_reward,
                     recovery=self.navigation.recover_home,
+                    task_scope=TaskScope.FULL_ONLY,
                 )
             )
         if self.tasks.ad_reward is not None:
@@ -101,6 +112,7 @@ class DailyWorkflowBuilder:
                         "广告奖励",
                         self.tasks.ad_reward,
                         recovery=self.navigation.recover_home,
+                        task_scope=TaskScope.AD_REWARD,
                     )
                 )
 
@@ -113,6 +125,7 @@ class DailyWorkflowBuilder:
                 "记录余额",
                 self.tasks.balance,
                 recovery=self.navigation.recover_home,
+                task_scope=TaskScope.BALANCE,
             )
             items.insert(context.random.randint(0, len(items)), balance)
             # 随机位置失败时收尾再试一次，成功后任务自身会跳过。
@@ -122,6 +135,17 @@ class DailyWorkflowBuilder:
                     "确认余额记录",
                     self.tasks.balance,
                     recovery=self.navigation.recover_home,
+                    task_scope=TaskScope.BALANCE,
+                )
+            )
+        if self.tasks.withdrawal is not None:
+            items.append(
+                StepDefinition(
+                    "更新提现信息",
+                    "更新提现信息",
+                    self.tasks.withdrawal,
+                    recovery=self.navigation.recover_home,
+                    task_scope=TaskScope.BALANCE,
                 )
             )
         return items

@@ -3,9 +3,16 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from hym.apps.specs import AppSpec, BalanceAssetSpec, CheckInSpec, CheckInStageSpec
+from hym.apps.specs import (
+    AppSpec,
+    BalanceAssetSpec,
+    CheckInSpec,
+    CheckInStageSpec,
+    WithdrawalSpec,
+)
 from hym.core.events import EventLevel
 from hym.core.models import Observation, SystemKey, WorkflowStatus
 from hym.core.targets import ResolveResult, TargetSpec
@@ -355,6 +362,139 @@ def _format_minor(value: int, scale: int) -> str:
 
 
 @dataclass(frozen=True, slots=True)
+class WithdrawalTask:
+    """低频读取提现页，只记录余额、门槛和是否可提现。"""
+
+    app_spec: AppSpec
+    go_task_page: TaskPageNavigator
+
+    def run(self, context: AppContext) -> StepOutcome:
+        spec = self.app_spec.withdrawal
+        if spec is None:
+            return StepOutcome.skipped("当前应用没有提现信息流程")
+        if self._is_fresh(context, spec):
+            return StepOutcome(WorkflowStatus.ALREADY_DONE, "提现信息仍在刷新周期内")
+        if context.ocr is None:
+            return StepOutcome.failure("提现信息需要 OCR，但当前没有可用 OCR 引擎")
+        if not self.go_task_page(context):
+            return StepOutcome.failure("更新提现信息时无法进入任务页")
+
+        opened = 0
+        for entry in spec.entry_sequence:
+            if not context.actions.tap_target(entry, timeout=2.0):
+                self._close(context, opened)
+                return StepOutcome.failure(f"没有找到提现页面入口: {entry.target_id}")
+            opened += 1
+            context.timing.wait(
+                context.sample_seconds(
+                    "withdrawal_page_wait_seconds",
+                    max(1.0, spec.page_wait_seconds * 0.6),
+                    max(1.0, spec.page_wait_seconds * 1.4),
+                    default_center=spec.page_wait_seconds,
+                )
+            )
+
+        for popup in spec.dismiss_popups:
+            if popup.marker is not None and not context.actions.exists(popup.marker, timeout=1.0):
+                continue
+            if context.actions.tap_target(popup.close_target, timeout=1.0):
+                context.timing.operation_delay()
+        observation = context.actions.observe(include_ui_tree=False, include_screenshot=True)
+        if observation is None or observation.screenshot is None:
+            self._close(context, spec.close_back_count)
+            return StepOutcome.failure("提现页面截图失败")
+        try:
+            texts = context.ocr.recognize(observation.screenshot)
+        except Exception as error:
+            self._close(context, spec.close_back_count)
+            return StepOutcome.failure(f"提现页面 OCR 失败: {error}")
+
+        available = _first_amount_in_region(texts, spec.available_region, spec.scale)
+        minimum = spec.minimum_amount_minor
+        if spec.minimum_region is not None:
+            detected = _minimum_amount_in_region(texts, spec.minimum_region, spec.scale)
+            if detected is not None:
+                minimum = detected
+        if available is None:
+            self._close(context, spec.close_back_count)
+            return StepOutcome.failure("没有识别到可提现余额")
+
+        eligible = minimum is not None and available >= minimum
+        data = {
+            "business_date": context.business_date.isoformat(),
+            "available_amount_minor": available,
+            "minimum_amount_minor": minimum,
+            "scale": spec.scale,
+            "unit": spec.unit,
+            "eligible": eligible,
+        }
+        context.state.set(
+            context.namespace,
+            "withdrawal:last",
+            {**data, "captured_at": context.timing.clock.now().isoformat()},
+        )
+        summary = f"可提现 {_format_minor(available, spec.scale)}{spec.unit}"
+        if minimum is not None:
+            summary += f"，门槛 {_format_minor(minimum, spec.scale)}{spec.unit}"
+        context.emit(
+            "reward.withdrawal.snapshot",
+            "提现信息更新",
+            summary,
+            workflow_id="daily",
+            step_id="更新提现信息",
+            status="success",
+            data=data,
+        )
+        self._close(context, spec.close_back_count)
+        return StepOutcome.success("提现信息更新完成", **data)
+
+    @staticmethod
+    def _is_fresh(context: AppContext, spec: WithdrawalSpec) -> bool:
+        value = context.state.get(context.namespace, "withdrawal:last", {})
+        if not isinstance(value, dict):
+            return False
+        try:
+            captured_date = date.fromisoformat(str(value["business_date"]))
+        except (KeyError, TypeError, ValueError):
+            return False
+        age = (context.business_date - captured_date).days
+        return 0 <= age < spec.refresh_days
+
+    @staticmethod
+    def _close(context: AppContext, count: int) -> None:
+        for _ in range(count):
+            context.actions.press(SystemKey.BACK)
+            context.timing.operation_delay()
+
+
+def _first_amount_in_region(texts, region, scale: int) -> int | None:
+    items = sorted(
+        (item for item in texts if _point_in_region(item.bounds.center, region)),
+        key=lambda item: (item.bounds.top, item.bounds.left),
+    )
+    for item in items:
+        amount = _amount_minor(item.text, scale)
+        if amount is not None:
+            return amount
+    return _amount_minor(" ".join(item.text for item in items), scale)
+
+
+def _minimum_amount_in_region(texts, region, scale: int) -> int | None:
+    amounts = {
+        amount
+        for item in texts
+        if _point_in_region(item.bounds.center, region)
+        for amount in (_amount_minor(item.text, scale),)
+        if amount is not None and amount >= 0
+    }
+    return min(amounts) if amounts else None
+
+
+def _point_in_region(point, region) -> bool:
+    return region.left <= point.x <= region.right and region.top <= point.y <= region.bottom
+
+
+@dataclass(frozen=True, slots=True)
 class DurationRewardTask:
     """领取当前 App 声明的时段奖励。"""
 
@@ -381,6 +521,14 @@ class DurationRewardTask:
             if spec.close_target is not None:
                 context.actions.tap_target(spec.close_target, timeout=1.0)
             return StepOutcome.failure("已点击时段奖励，但没有识别到到账提示")
+        if spec.success_target is not None:
+            context.record_reward(
+                "duration_reward",
+                "时段奖励已确认到账",
+                workflow_id="daily",
+                step_id="领取时段奖励",
+                evidence_target_id=spec.success_target.target_id,
+            )
         ad_outcome: StepOutcome | None = None
         if spec.ad_target is not None and self.app_spec.ad is not None:
             if context.actions.tap_target(spec.ad_target, timeout=1.0):

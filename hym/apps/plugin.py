@@ -12,7 +12,13 @@ from hym.runtime.content import ContentTask
 from hym.runtime.context import AppContext
 from hym.runtime.navigation import NavigationController
 from hym.runtime.news import NewsContentTask
-from hym.runtime.rewards import AdRewardTask, BalanceTask, CheckInTask, DurationRewardTask
+from hym.runtime.rewards import (
+    AdRewardTask,
+    BalanceTask,
+    CheckInTask,
+    DurationRewardTask,
+    WithdrawalTask,
+)
 from hym.runtime.video import VideoContentTask
 from hym.runtime.workflow import StepOutcome, WorkflowDefinition, WorkflowExecutor
 
@@ -55,6 +61,7 @@ def create_daily_plugin(
     content_handler: TaskHandler | None = None,
     tasks: DailyTaskSet | None = None,
     extra_steps: ExtraStepFactory | None = None,
+    cleanup_steps: ExtraStepFactory | None = None,
 ) -> ComposedAppPlugin:
     """按需组合现有任务；特殊 App 可以替换单项任务或整个工作流。"""
 
@@ -70,7 +77,13 @@ def create_daily_plugin(
             task_page_navigator=task_page_navigator,
             content_handler=content_handler,
         )
-    workflow = DailyWorkflowBuilder(spec, navigation, tasks, extra_steps)
+    workflow = DailyWorkflowBuilder(
+        spec=spec,
+        navigation=navigation,
+        tasks=tasks,
+        extra_steps=extra_steps,
+        cleanup_steps=cleanup_steps,
+    )
     return ComposedAppPlugin(spec, workflow)
 
 
@@ -91,6 +104,11 @@ def create_daily_task_set(
         content=ContentTask(content).run if content is not None else None,
         check_in=CheckInTask(spec, go_task_page).run if spec.check_in is not None else None,
         balance=BalanceTask(spec, go_task_page).run if spec.balance is not None else None,
+        withdrawal=(
+            WithdrawalTask(spec, go_task_page).run
+            if spec.withdrawal is not None
+            else None
+        ),
         duration_reward=(
             DurationRewardTask(spec, go_task_page).run
             if spec.duration_reward is not None

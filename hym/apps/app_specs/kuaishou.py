@@ -7,14 +7,14 @@
   才新增 target 或 CheckInStageSpec。保留旧标记，target_id 和策略名称不要随意改名，便于查日志。
 
 阅读与调参：
-- 本文件从上到下依次声明页面导航、激励广告、签到、余额、时段奖励、视频分类与互动；
+- 本文件从上到下依次声明页面导航、激励广告、签到、余额、提现信息、时段奖励、视频分类与互动；
   target 和 locator 的中文名称会原样进入日志，可直接对应真机命中过程。
 - 次数、概率和等待时长不写死在流程里，在 config/automation.json 的 kuaishou.options 调整：
   content_count_* 控制刷视频数量，*_duration_* 控制各类视频时长，*_probability 控制随机行为，
   ad_task_count_* 和 ad_* 控制广告轮数及等待，skip_content 可临时跳过内容任务。
 
 每日流程：启动并处理弹窗 -> 签到/刷视频随机先后 -> 领取时段奖励 -> 按概率执行广告任务；
-余额在这些步骤中随机插入，首次没记录成功时会在收尾补一次。
+余额在这些步骤中随机插入，首次没记录成功时会在收尾补一次；最后只读更新提现门槛。
 
 任务与限制：
 - 签到每天最多完成一次。当前可执行入口是“立即签到”，成功标记为“查看日历”/
@@ -22,7 +22,7 @@
 - “连续打卡白拿手机/去领取”属于另一种 365 天活动，当前不能当成每日签到入口。
 - 签到完成后如果出现“去看视频”，可继续处理奖励广告，然后关闭任务弹窗。
 - 余额从任务页顶部识别金币和现金；两个字段都命中后每天记录一次，失败时不写完成状态。
-- 时段奖励匹配“金币立即领取”或“点击领N金币”，到账后可继续看奖励广告。
+- 时段奖励匹配“金币立即领取”、“点击领N金币”或任务页右下角“点可领N金币”，到账后可继续看奖励广告。
 - 刷视频时先分类广告、长视频和普通视频；明确广告只短暂停留且禁止互动。
 - 视频流结构存在但关键分类标记均未命中时，按可配置的疑似广告快速划走并记录原因。
 - 普通视频约 8% 快速划过、25% 尝试完整观看，其余按常规时长观看；分类结束后仍保留最低停留时间。
@@ -46,7 +46,7 @@
 
 from __future__ import annotations
 
-from hym.apps.app_specs.common import BUTTON, IMAGE, TEXT, text_target
+from hym.apps.app_specs.common import IMAGE, text_target
 from hym.apps.plugin import ComposedAppPlugin, create_daily_plugin
 from hym.apps.specs import (
     AdSpec,
@@ -60,6 +60,7 @@ from hym.apps.specs import (
     NavigationSpec,
     PopupDismissSpec,
     VideoContentSpec,
+    WithdrawalSpec,
 )
 from hym.apps.targets import (
     activity_locator,
@@ -81,9 +82,9 @@ def kuaishou_spec() -> AppSpec:
     package_name = "com.kuaishou.nebula"
     prefix = "com.kuaishou.nebula:id/"
     ad_prefix = "com.kuaishou.nebula.commercial_neo:id/"
-    # 当前版本在 Poco 树中能完整暴露首页和任务页，原生 UI 树会被系统终止。
-    tree_source = "instrumentation"
-    observation_profile = ObservationProfile(UiTreeSource.INSTRUMENTATION)
+    # 当前版本只能从应用界面树稳定读取首页和任务页。
+    tree_source = UiTreeSource.APPLICATION
+    observation_profile = ObservationProfile(UiTreeSource.APPLICATION)
 
     # 首页和任务页标记；同一 target 内可继续追加新版 ID 或文案作为备选
     home_marker = target(
@@ -111,19 +112,6 @@ def kuaishou_spec() -> AppSpec:
         layout_locator("任务页关闭结构", IMAGE, position=(0.92, 0.1921), size=(0.0708, 0.0314)),
         metadata={"ui_tree_source": tree_source},
     )
-    duration_close = target(
-        "快手时段奖励关闭",
-        layout_locator("时段奖励关闭结构", IMAGE, position=(0.92, 0.1749), size=(0.0708, 0.0318)),
-        layout_locator(
-            "轻量奖励关闭结构",
-            TEXT,
-            position=(0.9275, 0.2250),
-            size=(0.0783, 0.0367),
-            priority=65,
-        ),
-        metadata={"ui_tree_source": tree_source},
-    )
-
     # 每轮奖励到账后按返回；只在奖励挽留弹窗内随机续看，达到上限后点右上角关闭
     ad_exit_targets = (task_marker, home_marker)
     ad_exit_prompt = target(
@@ -355,27 +343,54 @@ def kuaishou_spec() -> AppSpec:
                 ),
             ),
         ),
+        withdrawal=WithdrawalSpec(
+            entry_sequence=(
+                target(
+                    "快手提现入口",
+                    text_locator("领现金按钮文本", "领现金"),
+                    ocr_locator(
+                        "领现金按钮OCR",
+                        "领现金",
+                        mode="exact",
+                        region=Rect(0.65, 0.12, 1.0, 0.30),
+                        confidence=0.45,
+                    ),
+                ),
+            ),
+            available_region=Rect(0.05, 0.13, 0.45, 0.28),
+            minimum_region=Rect(0.05, 0.39, 0.95, 0.58),
+        ),
         ad=ad,
+        # 任务页右下角宝箱领取后原位变成倒计时，不会稳定出现到账弹窗。
+        # 这里只认右下角入口和冷却状态，避免用布局兜底误点任务列表。
         duration_reward=DurationRewardSpec(
             reward_target=target(
-                "快手时段奖励",
-                text_locator("轻量奖励文本", "金币立即领取", contains=True),
-                regex_locator("当前宝箱领取文本", r"点击领\s*\d+金币", priority=21),
+                "快手任务页右下角宝箱",
+                regex_locator(
+                    "右下角宝箱可领取描述",
+                    r"点可领\s*\d+金币",
+                    region=Rect(0.70, 0.70, 1.0, 1.0),
+                ),
                 metadata={"ui_tree_source": tree_source},
             ),
             success_target=target(
-                "快手奖励到账",
-                text_locator("宝箱奖励到账文本", "开宝箱奖励已到账"),
-                text_locator("任务完成奖励文本", "任务完成奖励", priority=21),
+                "快手宝箱进入冷却",
+                regex_locator(
+                    "右下角宝箱倒计时结构",
+                    r"\d{2}:\d{2}\s*\d+金币",
+                    region=Rect(0.70, 0.70, 1.0, 1.0),
+                ),
+                ocr_locator(
+                    "右下角宝箱倒计时OCR",
+                    r"\d{2}:\d{2}\s*\d+金币",
+                    mode="regex",
+                    region=Rect(0.70, 0.70, 1.0, 1.0),
+                    confidence=0.45,
+                    priority=20,
+                ),
                 metadata={"ui_tree_source": tree_source},
             ),
-            ad_target=target(
-                "快手奖励广告",
-                layout_locator("奖励广告结构", BUTTON, position=(0.5016, 0.6322), size=(0.5058, 0.0666)),
-                metadata={"ui_tree_source": tree_source},
-            ),
-            close_target=duration_close,
-            result_wait_seconds=4.0,
+            result_wait_seconds=3.0,
         ),
 
         # 新广告特征追加到 ad_markers，不能混入 normal_markers

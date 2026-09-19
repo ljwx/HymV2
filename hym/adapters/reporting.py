@@ -105,6 +105,7 @@ class DurableHttpEventSink:
                     "app_id": app.app_id,
                     "display_name": app.display_name,
                     "package_name": app.package_name,
+                    "capabilities": list(app.metadata.get("capabilities", ())),
                 }
                 for app in self.apps
             ],

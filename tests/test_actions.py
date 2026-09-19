@@ -108,7 +108,7 @@ class ActionControllerTest(unittest.TestCase):
         self.assertEqual({"text_length": 8}, event.data)
         self.assertNotIn("不写入日志的正文", event.message)
 
-    def test_target_can_select_accessibility_tree(self):
+    def test_target_can_select_system_tree(self):
         clock = FakeClock()
         random_source = DeterministicRandom()
         session = StubSession()
@@ -126,12 +126,12 @@ class ActionControllerTest(unittest.TestCase):
         target = TargetSpec(
             "任务页",
             (LocatorSpec("文本", LocatorKind.UI_TEXT, "任务中心"),),
-            metadata={"ui_tree_source": "accessibility"},
+            metadata={"ui_tree_source": "system"},
         )
 
         actions.resolve(target, timeout=0)
 
-        self.assertEqual(UiTreeSource.ACCESSIBILITY, session.requests[0].ui_tree_source)
+        self.assertEqual(UiTreeSource.SYSTEM, session.requests[0].ui_tree_source)
 
     def test_disabled_ocr_does_not_trigger_screenshot(self):
         clock = FakeClock()

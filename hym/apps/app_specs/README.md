@@ -12,10 +12,13 @@
 | 多了一种广告、普通内容或长内容标记 | 对应 `*_markers` 元组新增 target | 不需要 |
 | 签到多了一个页面层级或另一条路径 | `CheckInSpec.stages` 新增 `CheckInStageSpec` | 不需要 |
 | 多了启动弹窗或首页拦截 | `launch_intercepts` 或 `home_intercepts` 新增 `PopupDismissSpec` | 不需要 |
+| 请求获取已安装应用列表等非必要系统权限 | 先复用公共拒绝策略；只有 App 特殊文案才在本 App 增加精确弹窗标记 | 通常不需要 |
 | 重复点击已选中的首页会刷新或切换模式 | 对应 `NavigationSpec` 设置 `reselect_home_tab=False` | 不需要改公共执行器 |
 | App 的某一个任务机制不同 | 本 App 文件实现任务并替换 `DailyTaskSet` 对应字段 | 不需要改公共执行器 |
 | App 的任务集合或顺序完全不同 | 本 App 文件实现工作流构建器并调用 `create_custom_plugin` | 不需要改公共执行器 |
 | 出现视频、新闻、音频之外的新内容形态 | 新增内容策略及处理器 | 需要先按真实流程设计 |
+
+公共权限策略不会自动同意任何权限。App 自绘权限弹窗必须有明确权限标记才会点拒绝；系统权限弹窗必须先确认前台属于系统权限控制器。某个奖励流程确实依赖权限时，不要把“允许”塞进公共层，先记录真实路径并确认取舍。
 
 ## target 和 locator
 
@@ -151,6 +154,7 @@ ad_markers=(
 
 ```python
 from hym.apps.plugin import create_daily_plugin
+from hym.core.control import TaskScope
 from hym.runtime.workflow import StepDefinition, StepOutcome
 
 
@@ -165,6 +169,7 @@ def extra_steps(context):
             "快手独有任务",
             "执行快手独有任务",
             run_unique_task,
+            task_scope=TaskScope.FULL_ONLY,
         ),
     )
 
@@ -173,10 +178,32 @@ def create_plugin():
     return create_daily_plugin(kuaishou_spec(), extra_steps=extra_steps)
 ```
 
+`extra_steps` 位于余额和提现之前，适合 App 独有的领奖、浏览等业务。必须在所有业务之后执行的停止播放、
+关闭会话等收尾步骤使用 `cleanup_steps`；不要再包装一层工作流只为追加最后一步：
+
+```python
+def create_plugin():
+    return create_daily_plugin(
+        example_spec(),
+        cleanup_steps=lambda _: (
+            StepDefinition(
+                "停止应用",
+                "停止后台播放",
+                stop_playback,
+                task_scope=TaskScope.CLEANUP,
+            ),
+        ),
+    )
+```
+
 单个已有任务不同，使用 `create_daily_task_set()` 得到默认集合，再用 `dataclasses.replace()`
 替换 `check_in`、`balance`、`duration_reward`、`ad_reward` 或 `content`。如果任务集合和顺序都不同，
 在 App 文件实现带 `build(context)` 的工作流构建器，并通过 `create_custom_plugin()` 注册；不需要继承
 公共插件。不可重复的新任务要像签到一样在点击前记录每日动作检查点，不能只在成功后记录。
+
+需要从 KMP 控制台单独执行的步骤应声明 `task_scope`：主线、签到、余额和广告分别使用
+`MAIN`、`CHECK_IN`、`BALANCE`、`AD_REWARD`；启动准备使用 `SETUP`，必须执行的收尾使用 `CLEANUP`。
+只在完整流程运行的 App 独有任务保持默认 `FULL_ONLY`。这一分类只描述业务语义，不改变 App 自己的页面分支。
 
 例如只有签到机制不同，其他任务继续复用：
 
@@ -197,6 +224,21 @@ def create_plugin():
 
 `run_example_check_in(context)` 只属于该 App，返回统一的 `StepOutcome`。以后发现新签到路径时只改
 这个 App 文件；公共签到组件和其他 App 不受影响。
+
+内容首页和带底栏主页面不是同一页时，在该 App 的 `NavigationSpec` 设置
+`select_home_tab_before_task=False`。公共导航会先恢复主页面再进入任务页，不需要复制任务页导航器。
+
+## 当前新增 App 的维护入口
+
+| App ID | 文件 | 主线与独有分支 |
+| --- | --- | --- |
+| `fanqie_novel` | `fanqie_novel.py` | 横向翻页阅读；欢迎红包、签到红包弹窗 |
+| `toutiao_lite` | `toutiao_lite.py` | 新闻阅读；低概率小说奖励、多种任务弹窗 |
+| `fanqie_audio` | `fanqie_audio.py` | 长时收听；结束后强制停止应用 |
+| `baidu_lite` | `baidu_lite.py` | 短视频；签到前单次上滑、到账弹窗 |
+| `wukong_browser` | `wukong_browser.py` | 短视频/短剧；任务页自动每日领取、时段奖励 |
+
+内容数量、停留时长和奖励概率优先改 `config/automation.json` 对应 App 块；页面文案、ID、坐标或流程分支只改表中对应文件。不要为了某一个 App 的偶发页面去修改公共导航、定位或任务执行器。
 
 ## 修改后的检查
 

@@ -89,6 +89,14 @@ class BehaviorTimingTest(unittest.TestCase):
         self.assertEqual(6.0, behavior.operation_delay_center)
         self.assertEqual(1.0, behavior.operation_delay_stddev)
 
+    def test_app_rest_range_override_infers_normal_parameters(self):
+        behavior = BehaviorSettings().merged(
+            {"app_rest_seconds_min": 60.0, "app_rest_seconds_max": 180.0}
+        )
+
+        self.assertEqual(120.0, behavior.app_rest_seconds_center)
+        self.assertEqual(20.0, behavior.app_rest_seconds_stddev)
+
     def test_invalid_probability_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "automation.json"

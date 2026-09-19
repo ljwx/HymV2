@@ -440,10 +440,10 @@ def _tree_source(
         if value is None:
             continue
         requested.add(value if isinstance(value, UiTreeSource) else UiTreeSource(str(value)))
-    if UiTreeSource.ACCESSIBILITY in requested:
-        return UiTreeSource.ACCESSIBILITY
-    if UiTreeSource.INSTRUMENTATION in requested:
-        return UiTreeSource.INSTRUMENTATION
+    if UiTreeSource.SYSTEM in requested:
+        return UiTreeSource.SYSTEM
+    if UiTreeSource.APPLICATION in requested:
+        return UiTreeSource.APPLICATION
     return default
 
 

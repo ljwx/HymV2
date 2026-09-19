@@ -4,9 +4,14 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Protocol
 
+from hym.apps.app_specs.baidu_lite import create_plugin as create_baidu_lite_plugin
 from hym.apps.app_specs.douyin import create_plugin as create_douyin_plugin
+from hym.apps.app_specs.fanqie_audio import create_plugin as create_fanqie_audio_plugin
+from hym.apps.app_specs.fanqie_novel import create_plugin as create_fanqie_novel_plugin
 from hym.apps.app_specs.kuaishou import create_plugin as create_kuaishou_plugin
 from hym.apps.app_specs.qutoutiao import create_plugin as create_qutoutiao_plugin
+from hym.apps.app_specs.toutiao_lite import create_plugin as create_toutiao_lite_plugin
+from hym.apps.app_specs.wukong_browser import create_plugin as create_wukong_browser_plugin
 from hym.apps.app_specs.ximalaya import create_plugin as create_ximalaya_plugin
 from hym.apps.specs import iter_target_specs
 from hym.core.models import AppIdentity, WorkflowResult
@@ -67,6 +72,11 @@ def create_default_registry() -> AppRegistry:
         create_douyin_plugin,
         create_qutoutiao_plugin,
         create_ximalaya_plugin,
+        create_fanqie_novel_plugin,
+        create_toutiao_lite_plugin,
+        create_fanqie_audio_plugin,
+        create_baidu_lite_plugin,
+        create_wukong_browser_plugin,
     )
     for plugin_factory in plugin_factories:
         registry.register(plugin_factory())

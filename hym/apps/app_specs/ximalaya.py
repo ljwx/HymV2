@@ -40,6 +40,7 @@ from dataclasses import dataclass
 from hym.apps.specs import AppSpec, AudioContentSpec, NavigationSpec
 from hym.apps.plugin import ComposedAppPlugin, create_daily_plugin
 from hym.apps.targets import id_locator, query_locator, target
+from hym.core.control import TaskScope
 from hym.core.models import AppIdentity, UiTreeSource
 from hym.core.pages import ObservationProfile, PageSpec
 from hym.runtime.audio import AudioContentTask, AudioPlayback, DefaultAudioPlayback
@@ -51,7 +52,7 @@ from hym.runtime.workflow import StepDefinition, StepOutcome
 def ximalaya_spec() -> AppSpec:
     package_name = "com.ximalaya.ting.lite"
     prefix = f"{package_name}:id/"
-    observation_profile = ObservationProfile(UiTreeSource.INSTRUMENTATION)
+    observation_profile = ObservationProfile(UiTreeSource.APPLICATION)
 
     # 页面与导航标记；同一 target 内可继续追加新版 ID 或描述作为备选
     app_root = target(
@@ -183,7 +184,7 @@ def create_plugin() -> ComposedAppPlugin:
         spec,
         navigation=navigation,
         content_handler=content.run,
-        extra_steps=lambda _: (
+        cleanup_steps=lambda _: (
             StepDefinition(
                 "停止应用",
                 "停止喜马拉雅",
@@ -191,6 +192,7 @@ def create_plugin() -> ComposedAppPlugin:
                 max_attempts=2,
                 capture_on_failure=False,
                 allow_interruption_after=False,
+                task_scope=TaskScope.CLEANUP,
             ),
         ),
     )

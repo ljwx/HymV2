@@ -30,6 +30,7 @@ class DurableHttpEventSinkTest(unittest.TestCase):
             self.assertEqual(["event-1", "event-2"], [item["event_id"] for item in payload["events"]])
             self.assertEqual("device-1", payload["device"]["device_id"])
             self.assertEqual("抖音极速版", payload["apps"][0]["display_name"])
+            self.assertEqual(["check_in"], payload["apps"][0]["capabilities"])
 
     def test_failed_upload_keeps_queue_for_next_sink(self):
         attempts = 0
@@ -170,7 +171,14 @@ class DurableHttpEventSinkTest(unittest.TestCase):
             ),
             queue,
             DeviceDescriptor("device-1", model="测试手机"),
-            (AppIdentity("douyin", "com.example", "抖音极速版"),),
+            (
+                AppIdentity(
+                    "douyin",
+                    "com.example",
+                    "抖音极速版",
+                    metadata={"capabilities": ("check_in",)},
+                ),
+            ),
             sender=sender,
         )
 

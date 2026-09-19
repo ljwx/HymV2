@@ -2,12 +2,13 @@ import unittest
 import re
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+from hym.apps.app_specs.baidu_lite import baidu_lite_spec
 from hym.apps.app_specs.qutoutiao import QutoutiaoTaskPageNavigator
 from hym.apps.app_specs.ximalaya import XimalayaPlayback
 from hym.apps.catalog import douyin_spec, kuaishou_spec, qutoutiao_spec, ximalaya_spec
-from hym.core.models import ActivityInfo, Observation, Point, SystemKey, WorkflowStatus
+from hym.core.models import ActivityInfo, Observation, Point, SystemKey, UiTreeSource, WorkflowStatus
 from hym.core.pages import PageMatchResult, PageMatchStatus
 from hym.core.targets import LocatorKind, ResolveResult, ResolveStatus, ResolvedTarget
 from hym.runtime.interruption import InterruptionKind, InterruptionRequest, WorkflowYield
@@ -42,7 +43,7 @@ class StubActions:
         self.swipe_count = 0
         self.resolve_many_calls = []
 
-    def observe(self, *, include_ui_tree, include_screenshot):
+    def observe(self, *, include_ui_tree, include_screenshot, ui_tree_source=None):
         self.current = self.pages.pop(0)
         self.observation_count += 1
         package = self.packages.pop(0) if self.packages else "com.kuaishou.nebula"
@@ -213,6 +214,36 @@ class NavigationEfficiencyTest(unittest.TestCase):
         self.assertEqual([self.spec.navigation.home_tab.target_id], actions.tapped)
         self.assertEqual([], actions.pressed)
 
+    def test_launch_denies_installed_apps_permission_from_same_observation(self):
+        actions = StubActions(
+            [
+                {"读取已安装应用提示", "拒绝非必要权限"},
+                set(),
+            ]
+        )
+
+        closed = self.navigation.dismiss_launch(_context(actions))
+
+        self.assertEqual(1, closed)
+        self.assertEqual(["拒绝非必要权限"], actions.tapped)
+        self.assertEqual(2, actions.observation_count)
+
+    def test_system_permission_dialog_uses_native_tree_only_when_visible(self):
+        actions = StubActions(
+            [set(), {"拒绝非必要权限"}, set()],
+            packages=[
+                "com.android.permissioncontroller",
+                "com.android.permissioncontroller",
+                self.spec.identity.package_name,
+            ],
+        )
+
+        closed = self.navigation.dismiss_launch(_context(actions))
+
+        self.assertEqual(1, closed)
+        self.assertEqual(["拒绝非必要权限"], actions.tapped)
+        self.assertEqual(3, actions.observation_count)
+
     def test_douyin_does_not_reselect_home_tab_on_video_feed(self):
         spec = douyin_spec()
         actions = StubActions(
@@ -297,6 +328,39 @@ class NavigationEfficiencyTest(unittest.TestCase):
         self.assertEqual(2, actions.observation_count)
         self.assertEqual([self.spec.navigation.home_tab.target_id], actions.tapped)
         self.assertEqual([], actions.pressed)
+
+    def test_task_page_can_enter_without_selecting_content_tab(self):
+        spec = baidu_lite_spec()
+        observation = Observation(
+            "device-1",
+            ActivityInfo(spec.identity.package_name, "MainActivity"),
+        )
+        actions = SimpleNamespace(
+            match_page=Mock(
+                side_effect=(
+                    PageMatchResult(
+                        "baidu_lite.task",
+                        PageMatchStatus.NOT_MATCHED,
+                        observation,
+                    ),
+                    PageMatchResult(
+                        "baidu_lite.task",
+                        PageMatchStatus.MATCHED,
+                        observation,
+                    ),
+                )
+            ),
+            tap_target=Mock(return_value=True),
+            tap_first=Mock(return_value=None),
+        )
+        context = _context(actions)
+        navigation = NavigationController(spec)
+
+        with patch.object(NavigationController, "go_home", return_value=True) as go_home:
+            self.assertTrue(navigation.go_task_page(context))
+
+        go_home.assert_called_once_with(context, select_tab=False)
+        actions.tap_target.assert_called_once_with(spec.navigation.task_entry, timeout=2.0)
 
     def test_home_relaunches_once_when_foreground_left_app(self):
         actions = StubActions(
@@ -413,7 +477,7 @@ class NavigationEfficiencyTest(unittest.TestCase):
         self.assertIn("开宝箱奖励已到账", queries)
         self.assertIn("获得开宝箱奖励", queries)
 
-    def test_kuaishou_navigation_uses_instrumentation_tree(self):
+    def test_kuaishou_navigation_uses_application_tree(self):
         targets = (
             self.spec.navigation.home_marker,
             self.spec.navigation.home_tab,
@@ -422,7 +486,10 @@ class NavigationEfficiencyTest(unittest.TestCase):
         )
 
         self.assertTrue(
-            all(target.metadata.get("ui_tree_source") == "instrumentation" for target in targets)
+            all(
+                target.metadata.get("ui_tree_source") is UiTreeSource.APPLICATION
+                for target in targets
+            )
         )
 
     def test_kuaishou_reward_ad_can_be_recognized_by_activity(self):

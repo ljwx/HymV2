@@ -48,11 +48,11 @@ class SystemKey(str, Enum):
 
 
 class UiTreeSource(str, Enum):
-    """UI 树来源由目标声明，上层流程不依赖具体自动化框架。"""
+    """业务只声明需要应用界面树还是系统界面树。"""
 
     AUTO = "auto"
-    INSTRUMENTATION = "instrumentation"
-    ACCESSIBILITY = "accessibility"
+    APPLICATION = "application"
+    SYSTEM = "system"
 
 
 @dataclass(frozen=True, slots=True)

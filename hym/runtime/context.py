@@ -341,6 +341,27 @@ class AppContext:
             )
         )
 
+    def record_reward(
+        self,
+        reward_type: str,
+        message: str,
+        *,
+        workflow_id: str,
+        step_id: str,
+        **data: Any,
+    ) -> None:
+        """记录已确认到账的奖励，不触发额外设备观察。"""
+
+        self.emit(
+            "reward.claim.confirmed",
+            "奖励到账确认",
+            message,
+            workflow_id=workflow_id,
+            step_id=step_id,
+            status="success",
+            data={"reward_type": reward_type, **data},
+        )
+
 
 _ACTION_STATUS_TEXT = {
     DailyActionStatus.NOT_STARTED: "未开始",

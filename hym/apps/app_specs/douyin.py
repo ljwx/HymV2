@@ -7,14 +7,14 @@
   才新增 target 或 CheckInStageSpec。保留旧标记，target_id 和策略名称不要随意改名，便于查日志。
 
 阅读与调参：
-- 本文件从上到下依次声明页面导航、激励广告、签到、余额、时段奖励、视频分类与互动；
+- 本文件从上到下依次声明页面导航、激励广告、签到、余额、提现信息、时段奖励、视频分类与互动；
   target 和 locator 的中文名称会原样进入日志，可直接对应真机命中过程。
 - 次数、概率和等待时长不写死在流程里，在 config/automation.json 的 douyin.options 调整：
   content_count_* 控制刷视频数量，*_duration_* 控制各类视频时长，*_probability 控制随机行为，
   ad_task_count_* 和 ad_* 控制广告轮数及等待，skip_content 可临时跳过内容任务。
 
 每日流程：启动应用 -> 签到/刷视频随机先后 -> 领取时段奖励 -> 按概率执行广告任务；
-余额在这些步骤中随机插入，首次没记录成功时会在收尾补一次。
+余额在这些步骤中随机插入，首次没记录成功时会在收尾补一次；最后只读更新提现门槛。
 
 任务与限制：
 - 签到每天最多完成一次，并按当前页面动态匹配新版面板、旧版进度条或确认领取页。
@@ -57,6 +57,7 @@ from hym.apps.specs import (
     InteractionSpec,
     NavigationSpec,
     VideoContentSpec,
+    WithdrawalSpec,
 )
 from hym.apps.targets import (
     activity_locator,
@@ -77,7 +78,7 @@ from hym.core.pages import ObservationProfile, PageSpec
 def douyin_spec() -> AppSpec:
     package_name = "com.ss.android.ugc.aweme.lite"
     prefix = "com.ss.android.ugc.aweme.lite:id/"
-    observation_profile = ObservationProfile(UiTreeSource.INSTRUMENTATION)
+    observation_profile = ObservationProfile(UiTreeSource.APPLICATION)
 
     # 首页、任务页和视频流标记；同一 target 内可继续追加新版 ID 或文案作为备选
     home_marker = target("抖音首页标记", id_locator("首页根节点", prefix + "root_view"), required=True)
@@ -363,6 +364,23 @@ def douyin_spec() -> AppSpec:
                     unit="元",
                 ),
             ),
+        ),
+        withdrawal=WithdrawalSpec(
+            entry_sequence=(
+                target(
+                    "抖音提现入口",
+                    text_locator("去提现按钮文本", "去提现"),
+                    ocr_locator(
+                        "去提现按钮OCR",
+                        "去提现",
+                        mode="exact",
+                        region=Rect(0.65, 0.12, 1.0, 0.30),
+                        confidence=0.45,
+                    ),
+                ),
+            ),
+            available_region=Rect(0.25, 0.20, 0.72, 0.36),
+            minimum_region=Rect(0.05, 0.45, 0.95, 0.72),
         ),
         ad=ad,
         duration_reward=DurationRewardSpec(

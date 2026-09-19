@@ -43,6 +43,7 @@ PyCharm 可直接运行根目录 `main.py`，流程日志会实时显示在 Run 
 - `timing_scale`：普通等待总倍率，`0.6` 会把基准 5 秒缩短到约 3 秒。
 - `jitter_ratio`：没有独立范围的固定等待所使用的随机浮动比例；设为 `0` 时只做固定倍率缩放。
 - `operation_delay_min/center/max/stddev`：点击、返回、切页后的短等待分布。
+- `app_rest_seconds_min/center/max/stddev`：一个 App 完整结束后、下一个 App 启动前的桌面休息分布；当前为 2～5 分钟、中心值 3.5 分钟。
 - `reward_wait_scale`：广告奖励等待的独立倍率，避免普通调速导致奖励计时不足。
 - `touch_offset_ratio`：在目标内部加入很小的点击位置浮动。
 - `health_check_interval_seconds`：默认 `0`，表示不额外轮询设备；操作失败时才触发重连。无线调试不稳定时可以改为较大的正数。
@@ -62,6 +63,8 @@ PyCharm 可直接运行根目录 `main.py`，流程日志会实时显示在 Run 
 - `max_per_cycle`：同一设备单轮最多插空次数；达到上限后直接完成剩余任务。
 
 插空只在完整内容或独立步骤结束后检查一次，不增加 UI 轮询、截图或 OCR。运行中的视频、新闻和音频进度可以续跑；广告计时、签到提交和奖励领取过程中不会插空。只有一个待办 App 时，App 切换请求会自动改为桌面停留。
+
+App 间休息与随机插空相互独立。只有一个 App 的工作流完整结束且仍有待执行 App 时，系统才返回桌面并按 `app_rest_seconds_*` 等待；临时插空切换不触发，最后一个 App 结束后也不会再等待。
 
 每个 App 的 `options` 负责业务差异，常用项包括：
 
@@ -157,7 +160,10 @@ rg 'workflow.finished|workflow.suspended|runtime.interruption|diagnostic.thresho
     "batch_size": 100,
     "timeout_seconds": 10.0,
     "retry_interval_seconds": 30.0,
-    "upload_artifacts": true
+    "upload_artifacts": true,
+    "control_enabled": true,
+    "control_timeout_seconds": 1.0,
+    "control_poll_interval_seconds": 5.0
   }
 }
 ```
@@ -170,9 +176,21 @@ install -m 600 /path/to/automation-ingest-key ~/.config/hymv2/automation-ingest-
 .venv/bin/python -m hym --once
 ```
 
-也可以不配置密钥文件，只在启动前执行 `export JDCR_AUTOMATION_INGEST_KEY="服务端上报密钥"`。写入密钥只用于上报，不能读取 Server 数据，也不要直接写进配置文件。事件先追加到 `runtime/report_queue/<设备ID>.jsonl`，达到 `batch_size` 或本轮结束时批量发送。网络失败、服务不可用或证据上传失败不会中断 App 任务，本地队列会保留；失败后至少等待 `retry_interval_seconds` 才再试，避免断网时每条事件都消耗超时。事件以 `event_id` 去重。
+也可以不配置密钥文件，只在启动前执行 `export JDCR_AUTOMATION_INGEST_KEY="服务端上报密钥"`。写入密钥只用于上报，不能读取 Server 数据，也不要直接写进配置文件。事件先追加到 `runtime/report_queue/<设备ID>.jsonl`，本轮结束时按 `batch_size` 分批发送。网络失败、服务不可用或证据上传失败不会中断 App 任务，本地队列会保留；失败后至少等待 `retry_interval_seconds` 才再试，避免断网时每条事件都消耗超时。事件以 `event_id` 去重。
 
-`upload_artifacts` 开启后，达到重复失败阈值产生的截图、UI 树和执行上下文会跟随事件上传。正常流程不会为上报额外截图。Android App 登录同一 Server 后，从“设置 > 数据 > 运行中心”查看今天或近 7 天的数据。“执行”页在一屏内展示总用时、完成步数、每分钟效率、异常、各 App 余额和执行记录；“微信资产”页展示零钱和最近 10 笔去重账单。从第二个业务日起，余额行会显示“较昨日”；中间日期缺失时显示“较上次”。
+`upload_artifacts` 开启后，达到重复失败阈值产生的截图、UI 树和执行上下文会跟随事件上传。正常流程不会为上报额外截图。Android App 登录同一 Server 后，从“设置 > 数据 > 运行中心”查看今天或近 7 天的数据。“执行”页的当天总表按 App 展示启动次数、确认奖励次数、总耗时、签到状态、余额和提现门槛；“微信资产”页展示零钱和最近 10 笔去重账单。从第二个业务日起，余额行会显示“较昨日”；中间日期缺失时显示“较上次”。
+
+支持提现信息的 App 默认每天只读打开一次提现页，单次截图只执行一次 OCR，并上报可提现金额、最低门槛和是否达标。运行中心按 App 中文名称展示最近快照；采集周期可在 App 的 `WithdrawalSpec.refresh_days` 调成两天。流程不会保存整页 OCR 文本，也不会点击提现、兑换、支付或银行卡相关按钮。
+
+“确认奖励次数”只统计已经命中结果证据的签到、广告完成和通用领奖事件。普通内容浏览、仅点击奖励按钮、未命中完成信号的兜底等待均不计数。统计复用流程已经获得的结果，不增加截图、OCR、页面轮询或等待；运行中只多追加一条很小的本地事件，仍在整轮结束时批量上报。
+
+### KMP 设备控制台
+
+持续运行时不要添加 `--once`。运行中心的“控制”页可以按设备暂停/继续，或下发单 App 完整任务、签到、余额、广告奖励、主线任务，以及全部 App 的多轮完整任务。单 App 只显示它已经上报的能力；新增 App 的任务步骤需要声明对应 `task_scope`。
+
+暂停只在步骤结束或内容单元安全点生效，不会截断正在播放的奖励广告或正在提交的签到动作。进入暂停后设备返回桌面，再次点击继续即可恢复；即使没有手动继续，45 分钟后也会自动恢复。控制状态每 5 秒低频读取，单次网络超时默认 1 秒，Server 不可用时按 `retry_interval_seconds` 退避，不增加截图、OCR 或 UI 树读取。
+
+任务命令使用服务端持久队列。运行器在一轮任务结束后领取下一条命令；单 App 命令从启动步骤重新执行，全部 App 按配置顺序执行，应用之间仍保留配置的休息时间。命令状态会显示为排队中、执行中、已完成或失败。
 
 ## 趣头条
 
@@ -181,6 +199,16 @@ install -m 600 /path/to/automation-ingest-key ~/.config/hymv2/automation-ingest-
 ## 喜马拉雅
 
 喜马拉雅使用长时音频会话，不按视频方式逐条滑动。当前只负责从首页恢复播放、低频确认前台状态和有限恢复，奖励入口尚未配置。短音频会话已有真机成功记录；最新长会话发现 App 返回后可能自动续播，恢复逻辑现同时接受“正在播放”和“开始播放”状态，待设备重连后复验。
+
+## 新增五个 App
+
+- `fanqie_novel`：主线为随机小说横向翻页，`novel_pages_*` 和 `novel_page_seconds_*` 控制页数与每页停留；阅读页优先按 `ReaderActivity` 确认，签到、余额和低概率广告仍走任务页。
+- `toutiao_lite`：主线为新闻阅读，另以较低概率执行小说奖励；文章数量和阅读滑动由 `news_*` 参数控制。
+- `fanqie_audio`：主线为长时收听，使用 `audio_session_seconds_*` 和低频检查参数；无论中间步骤是否成功，完整流程结束都会停止应用，避免后台继续播放。
+- `baidu_lite`：主线为短视频，另执行签到、余额和广告奖励。当前版本签到入口需要在任务页向上滑动一次，这个分支只在百度文件中处理。
+- `wukong_browser`：主线为短视频/短剧，另执行每日领取、时段奖励、余额、已达标待领取奖励和低概率广告；只认明确的领取结果或已完成状态，不把普通“今日”文案当成成功。
+
+这些 App 已加入默认注册表和设备配置，可通过 `--app <app_id> --once --direct` 单独验证。视频、新闻、小说和音频的数量或时长都由各 App 配置独立控制；想提高收益时先调对应配置，不需要修改公共任务代码。
 
 ## 增加 App
 
@@ -194,4 +222,6 @@ install -m 600 /path/to/automation-ingest-key ~/.config/hymv2/automation-ingest-
 
 已有 App 的 ID、文案、页面分支和独有任务如何维护，见 [`hym/apps/app_specs/README.md`](../hym/apps/app_specs/README.md)。每个 App 文件底部拥有自己的 `create_plugin()`；新增 App 只需在注册表增加一次工厂，后续流程变化保持在该 App 文件和配置块内。
 
-App 和页面通过 `ObservationProfile` 选择 `instrumentation` 或 `accessibility`，特殊目标仍可单独覆盖。同一 App 可以按页面混用。OCR、图片和坐标是后备定位策略，不会默认参与每一次页面判断。
+App 和页面通过 `ObservationProfile` 选择应用界面树（`application`）或系统界面树（`system`），特殊目标仍可单独覆盖。同一 App 可以按页面混用。具体由 Airtest/Poco、Appium 或无障碍采集，由适配器负责映射；业务规格不感知驱动。OCR、图片和坐标是后备定位策略，不会默认参与每一次页面判断。
+
+启动或恢复时若出现非必要系统权限，框架默认拒绝；“获取其他已安装应用”一类 App 自绘弹窗必须同时匹配权限文案和拒绝按钮。只有前台是系统权限控制器时才额外读取一次原生 UI 树，因此没有弹窗时不会增加截图或 OCR 成本。首次隐私协议、登录授权和确实影响奖励的必要权限仍由人工确认。

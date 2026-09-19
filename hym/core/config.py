@@ -20,6 +20,10 @@ class BehaviorSettings:
     operation_delay_center: float = 1.5
     operation_delay_max: float = 2.5
     operation_delay_stddev: float = 0.33
+    app_rest_seconds_min: float = 120.0
+    app_rest_seconds_center: float = 210.0
+    app_rest_seconds_max: float = 300.0
+    app_rest_seconds_stddev: float = 30.0
     touch_duration_min: float = 0.03
     touch_duration_center: float = 0.09
     touch_duration_max: float = 0.15
@@ -50,6 +54,12 @@ class BehaviorSettings:
             raise ValueError("操作等待中心值必须位于配置范围内")
         if self.operation_delay_stddev <= 0:
             raise ValueError("操作等待标准差必须大于零")
+        if self.app_rest_seconds_min > self.app_rest_seconds_max:
+            raise ValueError("应用间休息范围无效")
+        if not self.app_rest_seconds_min <= self.app_rest_seconds_center <= self.app_rest_seconds_max:
+            raise ValueError("应用间休息中心值必须位于配置范围内")
+        if self.app_rest_seconds_stddev <= 0:
+            raise ValueError("应用间休息标准差必须大于零")
         if self.touch_duration_min > self.touch_duration_max:
             raise ValueError("触摸时长范围无效")
         if not self.touch_duration_min <= self.touch_duration_center <= self.touch_duration_max:
@@ -83,7 +93,12 @@ class BehaviorSettings:
             raise ValueError(f"未知行为配置: {', '.join(sorted(unknown))}")
         merged_values = dict(values)
         # 兼容只覆盖上下限的旧配置；显式中心值和标准差始终优先。
-        for prefix in ("operation_delay", "touch_duration", "swipe_duration"):
+        for prefix in (
+            "operation_delay",
+            "app_rest_seconds",
+            "touch_duration",
+            "swipe_duration",
+        ):
             minimum_key = f"{prefix}_min"
             maximum_key = f"{prefix}_max"
             center_key = f"{prefix}_center"
@@ -154,6 +169,9 @@ class ReportingSettings:
     timeout_seconds: float = 10.0
     retry_interval_seconds: float = 30.0
     upload_artifacts: bool = True
+    control_enabled: bool = True
+    control_timeout_seconds: float = 1.0
+    control_poll_interval_seconds: float = 5.0
 
     def __post_init__(self) -> None:
         if self.enabled and not self.server_url.startswith(("http://", "https://")):
@@ -168,6 +186,10 @@ class ReportingSettings:
             raise ValueError("上报超时时间必须大于零")
         if self.retry_interval_seconds < 0:
             raise ValueError("上报重试间隔不能小于零")
+        if self.control_timeout_seconds <= 0:
+            raise ValueError("运行控制超时时间必须大于零")
+        if self.control_poll_interval_seconds <= 0:
+            raise ValueError("运行控制轮询间隔必须大于零")
 
 
 @dataclass(frozen=True, slots=True)

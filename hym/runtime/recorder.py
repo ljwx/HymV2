@@ -10,7 +10,8 @@ from uuid import uuid4
 from hym.adapters.airtest_poco import AirtestPocoDeviceFactory
 from hym.adapters.local import LocalArtifactStore, SystemClock
 from hym.core.config import RuntimeSettings
-from hym.core.events import ConsoleEventSink, EventFilter, EventLevel, to_jsonable
+from hym.adapters.events import ConsoleEventSink
+from hym.core.events import EventFilter, EventLevel, to_jsonable
 from hym.core.models import ObservationRequest, UiNode, UiTreeSource, utc_now
 from hym.core.ports import OcrEnginePort
 from hym.locators.vision import create_ocr_engine
@@ -131,7 +132,7 @@ class ManualFlowRecorder:
                 ObservationRequest(
                     include_ui_tree=True,
                     include_screenshot=False,
-                    ui_tree_source=UiTreeSource.ACCESSIBILITY,
+                    ui_tree_source=UiTreeSource.SYSTEM,
                 )
             )
             if fallback.succeeded and fallback.observation is not None:

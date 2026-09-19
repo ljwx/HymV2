@@ -217,6 +217,8 @@ class DeviceWorkerSchedulingTest(unittest.TestCase):
             )
             for setting in app_settings
         }
+        for context in contexts.values():
+            context.actions = StubActions()
         worker = object.__new__(DeviceWorker)
         worker.settings = SimpleNamespace(
             interruptions=InterruptionSettings(
@@ -246,6 +248,16 @@ class DeviceWorkerSchedulingTest(unittest.TestCase):
         self.assertEqual(
             [("a1", "步骤1"), ("a2", "步骤1"), ("a2", "步骤2"), ("a1", "步骤2")],
             operations,
+        )
+        self.assertEqual([210.0], clock.sleeps)
+        rest_events = [
+            event.event_type
+            for event in events.events
+            if event.event_type.startswith("runtime.app_rest.")
+        ]
+        self.assertEqual(
+            ["runtime.app_rest.started", "runtime.app_rest.finished"],
+            rest_events,
         )
         for context in contexts.values():
             cursor = state.get(context.namespace, "runtime:workflow_cursor")

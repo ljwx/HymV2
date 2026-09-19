@@ -2,6 +2,7 @@ import unittest
 
 from hym.adapters.airtest_poco import AirtestPocoDeviceAdapter
 from hym.core.models import (
+    ActionStatus,
     AppIdentity,
     DeviceDescriptor,
     ObservationRequest,
@@ -80,6 +81,11 @@ class StubPoco:
         }
 
 
+class BrokenPoco:
+    def dump(self):
+        raise RuntimeError("测试树失败")
+
+
 class StubManager:
     device_ready = True
 
@@ -138,6 +144,16 @@ class AirtestPocoDeviceAdapterTest(unittest.TestCase):
         self.assertEqual("BGR", observation.screenshot.pixel_format)
         self.assertEqual(10, observation.screenshot.width)
 
+    def test_required_ui_tree_failure_is_not_reported_as_success(self):
+        self.manager.poco = BrokenPoco()
+
+        result = self.adapter.observe(ObservationRequest(include_ui_tree=True))
+
+        self.assertEqual(ActionStatus.FAILED, result.status)
+        self.assertFalse(result.succeeded)
+        self.assertFalse(result.retryable)
+        self.assertIn("UI 树获取失败", result.message)
+
     def test_poco_service_activity_falls_back_to_real_foreground_app(self):
         self.manager.dev.activity_output = (
             "topResumedActivity=ActivityRecord{123456 u0 "
@@ -180,9 +196,9 @@ class AirtestPocoDeviceAdapterTest(unittest.TestCase):
         self.assertTrue(result.succeeded)
         self.assertNotIn(("disconnect",), self.manager.dev.calls)
 
-    def test_accessibility_tree_can_be_selected_per_observation(self):
+    def test_system_tree_can_be_selected_per_observation(self):
         result = self.adapter.observe(
-            ObservationRequest(ui_tree_source=UiTreeSource.ACCESSIBILITY)
+            ObservationRequest(ui_tree_source=UiTreeSource.SYSTEM)
         )
 
         self.assertTrue(result.succeeded)
@@ -190,7 +206,7 @@ class AirtestPocoDeviceAdapterTest(unittest.TestCase):
         self.assertEqual("任务中心", node.text)
         self.assertEqual("com.example:id/task", node.resource_id)
         self.assertAlmostEqual(0.1, node.bounds.left)
-        self.assertEqual("accessibility", result.observation.metadata["ui_tree_source"])
+        self.assertEqual("system", result.observation.metadata["ui_tree_source"])
 
 
 if __name__ == "__main__":

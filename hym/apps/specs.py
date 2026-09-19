@@ -29,6 +29,7 @@ class NavigationSpec:
     page_wait_seconds: float = 4.0
     home_attempts: int = 5
     reselect_home_tab: bool = True
+    select_home_tab_before_task: bool = True
     transient_activity_patterns: tuple[str, ...] = ()
     home_page: PageSpec | None = None
     task_page: PageSpec | None = None
@@ -116,6 +117,36 @@ class BalanceSpec:
             raise ValueError("余额字段标识不能重复")
         if self.enter_wait_seconds is not None and self.enter_wait_seconds < 0:
             raise ValueError("余额页面等待时间不能小于零")
+
+
+@dataclass(frozen=True, slots=True)
+class WithdrawalSpec:
+    """声明提现页入口和金额区域；采集端只上报结构化金额。"""
+
+    entry_sequence: tuple[TargetSpec, ...]
+    available_region: Rect
+    minimum_region: Rect | None = None
+    minimum_amount_minor: int | None = None
+    dismiss_popups: tuple[PopupDismissSpec, ...] = ()
+    scale: int = 2
+    unit: str = "元"
+    refresh_days: int = 1
+    page_wait_seconds: float = 4.0
+    close_back_count: int = 1
+
+    def __post_init__(self) -> None:
+        if not self.entry_sequence:
+            raise ValueError("提现流程至少需要一个入口")
+        if not 0 <= self.scale <= 6:
+            raise ValueError("提现金额小数位必须位于 0 到 6 之间")
+        if self.minimum_amount_minor is not None and self.minimum_amount_minor < 0:
+            raise ValueError("最低提现金额不能小于零")
+        if self.refresh_days < 1:
+            raise ValueError("提现信息刷新间隔必须大于零")
+        if self.page_wait_seconds < 0:
+            raise ValueError("提现页面等待时间不能小于零")
+        if self.close_back_count < 0:
+            raise ValueError("提现页面返回次数不能小于零")
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,6 +285,7 @@ class AppSpec:
     ad: AdSpec | None
     duration_reward: DurationRewardSpec | None
     content: ContentSpec | None
+    withdrawal: WithdrawalSpec | None = None
     ad_entry: TargetSpec | None = None
     observation_profile: ObservationProfile = field(default_factory=ObservationProfile)
     metadata: Mapping[str, Any] = field(default_factory=dict)

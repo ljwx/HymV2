@@ -21,9 +21,10 @@ from hym.core.models import (
     SwipeGesture,
     SystemKey,
 )
-from hym.core.targets import ResolveResult, TargetSpec
+from hym.core.targets import LocatorKind, ResolveResult, TargetSpec
 
 if TYPE_CHECKING:
+    from hym.core.control import DeviceControlState, RemoteCommand
     from hym.core.events import AutomationEvent
 
 T = TypeVar("T")
@@ -69,6 +70,8 @@ class LocatorPort(Protocol):
     """只根据一次页面观察定位目标，不直接操作设备。"""
 
     def resolve(self, target: TargetSpec, observation: Observation) -> ResolveResult: ...
+
+    def supports(self, kind: LocatorKind) -> bool: ...
 
 
 @runtime_checkable
@@ -140,3 +143,23 @@ class RandomPort(Protocol):
     def randint(self, start: int, end: int) -> int: ...
 
     def choice(self, items: Sequence[T]) -> T: ...
+
+
+@runtime_checkable
+class RemoteControlPort(Protocol):
+    """屏蔽 HTTP 等传输细节，运行器只处理暂停状态和任务命令。"""
+
+    def control(self, device_id: str) -> DeviceControlState: ...
+
+    def acknowledge_pause(self, device_id: str) -> None: ...
+
+    def claim_command(self, device_id: str) -> RemoteCommand | None: ...
+
+    def complete_command(
+        self,
+        device_id: str,
+        command_id: str,
+        *,
+        succeeded: bool,
+        message: str,
+    ) -> None: ...

@@ -1,9 +1,10 @@
 import unittest
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
 from hym.apps.app_specs import kuaishou_spec, qutoutiao_spec
-from hym.core.models import WorkflowStatus
-from hym.runtime.rewards import BalanceTask, DurationRewardTask
+from hym.core.models import ActivityInfo, ImageFrame, Observation, OcrText, Rect, WorkflowStatus
+from hym.runtime.rewards import BalanceTask, DurationRewardTask, WithdrawalTask
 
 
 class StubActions:
@@ -14,12 +15,17 @@ class StubActions:
 
     def tap_target(self, target, timeout=2.0):
         self.tapped.append(target.target_id)
+        if target.target_id == "快手奖励广告":
+            return False
         return True
 
     def exists(self, target, timeout=1.0):
         if target.target_id == "快手收益页":
             return self.page_exists
         return self.reward_exists
+
+    def needs_screenshot(self, targets):
+        return False
 
 
 class StubTiming:
@@ -34,11 +40,27 @@ class StubTiming:
         self.operation_delays += 1
 
 
+class StubState:
+    def __init__(self):
+        self.values = {}
+
+    def get(self, namespace, key, default=None):
+        return self.values.get((namespace, key), default)
+
+    def set(self, namespace, key, value):
+        self.values[(namespace, key)] = value
+
+
 def context(actions):
+    rewards = []
     return SimpleNamespace(
         actions=actions,
         timing=StubTiming(),
         daily_value=lambda key: None,
+        rewards=rewards,
+        record_reward=lambda reward_type, message, **data: rewards.append(
+            (reward_type, message, data)
+        ),
     )
 
 
@@ -63,7 +85,7 @@ class RewardTaskTest(unittest.TestCase):
 
         self.assertEqual(WorkflowStatus.ALREADY_DONE, outcome.status)
 
-    def test_duration_reward_cleans_popup_after_unconfirmed_result(self):
+    def test_duration_reward_reports_unconfirmed_without_follow_up_clicks(self):
         spec = kuaishou_spec()
         actions = StubActions(reward_exists=False)
         current = context(actions)
@@ -71,11 +93,62 @@ class RewardTaskTest(unittest.TestCase):
         outcome = DurationRewardTask(spec, lambda _: True).run(current)
 
         self.assertEqual(WorkflowStatus.RETRYABLE_FAILURE, outcome.status)
-        self.assertEqual([4.0], current.timing.waits)
-        self.assertEqual(
-            ["快手时段奖励", "快手时段奖励关闭"],
-            actions.tapped,
+        self.assertEqual([3.0], current.timing.waits)
+        self.assertEqual(["快手任务页右下角宝箱"], actions.tapped)
+        self.assertEqual([], current.rewards)
+
+    def test_duration_reward_records_only_confirmed_claim(self):
+        spec = kuaishou_spec()
+        current = context(StubActions())
+
+        outcome = DurationRewardTask(spec, lambda _: True).run(current)
+
+        self.assertEqual(WorkflowStatus.SUCCESS, outcome.status)
+        self.assertEqual("duration_reward", current.rewards[0][0])
+        self.assertIsNone(spec.duration_reward.ad_target)
+        self.assertIsNone(spec.duration_reward.close_target)
+
+    def test_withdrawal_reads_one_screenshot_and_records_structured_amounts(self):
+        spec = kuaishou_spec()
+        actions = StubActions()
+        actions.tap_first = lambda targets, timeout=1.0: None
+        actions.press = lambda key: True
+        actions.observe = lambda **kwargs: Observation(
+            "device-1",
+            ActivityInfo(),
+            screenshot=ImageFrame(10, 10, b"frame"),
         )
+        state = StubState()
+        events = []
+        current = SimpleNamespace(
+            actions=actions,
+            timing=SimpleNamespace(
+                wait=lambda seconds: None,
+                operation_delay=lambda: None,
+                clock=SimpleNamespace(now=lambda: datetime(2026, 9, 19, tzinfo=timezone.utc)),
+            ),
+            sample_seconds=lambda *args, **kwargs: 0,
+            state=state,
+            namespace="device-1:kuaishou",
+            business_date=date(2026, 9, 19),
+            ocr=SimpleNamespace(
+                recognize=lambda frame: (
+                    OcrText("3.20", Rect(0.10, 0.18, 0.25, 0.22), 0.99, "test"),
+                    OcrText("0.5元", Rect(0.10, 0.42, 0.25, 0.47), 0.99, "test"),
+                    OcrText("15元", Rect(0.40, 0.42, 0.55, 0.47), 0.99, "test"),
+                )
+            ),
+            emit=lambda *args, **kwargs: events.append((args, kwargs)),
+        )
+
+        outcome = WithdrawalTask(spec, lambda _: True).run(current)
+
+        self.assertEqual(WorkflowStatus.SUCCESS, outcome.status)
+        snapshot = state.get(current.namespace, "withdrawal:last")
+        self.assertEqual(320, snapshot["available_amount_minor"])
+        self.assertEqual(50, snapshot["minimum_amount_minor"])
+        self.assertTrue(snapshot["eligible"])
+        self.assertEqual("reward.withdrawal.snapshot", events[0][0][0])
 
 
 if __name__ == "__main__":

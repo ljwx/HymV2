@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import hashlib
 import re
 
+from hym.core.control import TaskScope
 from hym.core.models import AppIdentity, OcrText, SystemKey, WorkflowResult, WorkflowStatus
 from hym.core.pages import ObservationProfile
 from hym.core.randomness import bounded_normal_int
@@ -27,7 +28,19 @@ class WechatPlugin:
 
     def __init__(self, settings: WechatSettings) -> None:
         self.settings = settings
-        self.spec = WechatSpec()
+        capabilities = []
+        if settings.moments.enabled or settings.chat.enabled:
+            capabilities.append("content")
+        if settings.wallet.enabled:
+            capabilities.append("balance")
+        spec = WechatSpec()
+        self.spec = replace(
+            spec,
+            identity=replace(
+                spec.identity,
+                metadata={**spec.identity.metadata, "capabilities": tuple(capabilities)},
+            ),
+        )
 
     @property
     def app_id(self) -> str:
@@ -53,16 +66,29 @@ class WechatPlugin:
                 continue_on_failure=False,
                 recovery=self._restart_app,
                 allow_interruption_after=False,
+                task_scope=TaskScope.SETUP,
             )
         ]
         view_steps: list[StepDefinition] = []
         if self.settings.moments.enabled:
             view_steps.append(
-                StepDefinition("查看朋友圈", "查看朋友圈", self._browse_moments, recovery=self._recover_home)
+                StepDefinition(
+                    "查看朋友圈",
+                    "查看朋友圈",
+                    self._browse_moments,
+                    recovery=self._recover_home,
+                    task_scope=TaskScope.MAIN,
+                )
             )
         if self.settings.wallet.enabled:
             view_steps.append(
-                StepDefinition("查看零钱", "查看零钱", self._capture_wallet, recovery=self._recover_home)
+                StepDefinition(
+                    "查看零钱",
+                    "查看零钱",
+                    self._capture_wallet,
+                    recovery=self._recover_home,
+                    task_scope=TaskScope.BALANCE,
+                )
             )
         if self.settings.randomize_view_order and len(view_steps) > 1 and context.random.random() < 0.5:
             view_steps.reverse()
@@ -70,7 +96,13 @@ class WechatPlugin:
         if self.settings.chat.enabled:
             # 聊天固定放在最后，失败时不会影响查看类任务。
             steps.append(
-                StepDefinition("指定好友聊天", "指定好友聊天", self._chat, recovery=self._recover_home)
+                StepDefinition(
+                    "指定好友聊天",
+                    "指定好友聊天",
+                    self._chat,
+                    recovery=self._recover_home,
+                    task_scope=TaskScope.MAIN,
+                )
             )
         return WorkflowDefinition("wechat_activity", "微信基本操作", tuple(steps))
 

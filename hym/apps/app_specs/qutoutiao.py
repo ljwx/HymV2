@@ -77,7 +77,7 @@ from hym.runtime.navigation import NavigationController
 def qutoutiao_spec() -> AppSpec:
     package_name = "com.jifen.qukan"
     prefix = "com.jifen.qukan:id/"
-    observation_profile = ObservationProfile(UiTreeSource.INSTRUMENTATION)
+    observation_profile = ObservationProfile(UiTreeSource.APPLICATION)
 
     # 首页、任务页和文章流标记；同一 target 内可继续追加新版 ID 或文案作为备选
     home_tab = target(

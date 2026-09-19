@@ -6,10 +6,51 @@ from dataclasses import dataclass
 
 from hym.apps.specs import AppSpec, PopupDismissSpec
 from hym.core.events import EventLevel
-from hym.core.models import Observation, SystemKey
+from hym.core.models import Observation, SystemKey, UiTreeSource
 from hym.core.pages import PageSpec
-from hym.core.targets import TargetSpec
+from hym.core.targets import LocatorKind, LocatorSpec, TargetSpec
 from hym.runtime.context import AppContext
+
+
+_INSTALLED_APPS_PERMISSION = TargetSpec(
+    "读取已安装应用提示",
+    tuple(
+        LocatorSpec(
+            f"已安装应用权限文本{index}",
+            LocatorKind.UI_QUERY,
+            options={"contains_text": phrase},
+        )
+        for index, phrase in enumerate(
+            (
+                "获取已安装应用",
+                "读取已安装应用",
+                "查看已安装应用",
+                "获取其他已安装应用",
+                "读取其他已安装应用",
+                "其他已安装的应用",
+                "已安装的应用列表",
+            ),
+            start=1,
+        )
+    ),
+)
+_OPTIONAL_PERMISSION_DENY = TargetSpec(
+    "拒绝非必要权限",
+    tuple(
+        LocatorSpec(f"{label}文本", LocatorKind.UI_TEXT, label, priority=index)
+        for index, label in enumerate(
+            ("不允许", "拒绝", "拒绝并不再询问", "禁止", "不同意", "取消", "暂不"),
+            start=10,
+        )
+    ),
+)
+_SYSTEM_PERMISSION_PACKAGES = frozenset(
+    (
+        "com.android.permissioncontroller",
+        "com.google.android.permissioncontroller",
+        "com.huawei.systemmanager",
+    )
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,7 +61,11 @@ class NavigationController:
 
     def dismiss_launch(self, context: AppContext) -> int:
         navigation = self.spec.navigation
-        targets = [*navigation.launch_dismiss]
+        targets = [
+            *navigation.launch_dismiss,
+            _INSTALLED_APPS_PERMISSION,
+            _OPTIONAL_PERMISSION_DENY,
+        ]
         for popup in navigation.launch_intercepts:
             targets.append(popup.close_target)
             if popup.marker is not None:
@@ -28,11 +73,21 @@ class NavigationController:
 
         closed = 0
         # 最多处理两层连续弹窗，正常启动只观察一次。
-        for _ in range(2):
+        for attempt in range(2):
+            used_activity_fallback = False
             observation = context.actions.observe_for(targets, include_screenshot=False)
             if observation is None:
+                # 系统权限页可能不允许 Poco 读取，失败后只补一次 Activity 观察。
+                used_activity_fallback = True
+                observation = context.actions.observe(
+                    include_ui_tree=False,
+                    include_screenshot=False,
+                )
+            if observation is None:
                 break
-            target_id = self.tap_first_in(context, navigation.launch_dismiss, observation)
+            target_id = self.dismiss_optional_permission(context, observation)
+            if target_id is None:
+                target_id = self.tap_first_in(context, navigation.launch_dismiss, observation)
             if target_id is None:
                 target_id = self.dismiss_popup_in(
                     context,
@@ -40,6 +95,9 @@ class NavigationController:
                     observation,
                 )
             if target_id is None:
+                if used_activity_fallback and attempt == 0:
+                    context.timing.operation_delay()
+                    continue
                 break
             closed += 1
             self.emit_popup_dismissed(context, target_id)
@@ -72,6 +130,21 @@ class NavigationController:
                 visual_fallback=False,
             )
             observation = page_result.observation
+            if observation is None:
+                current = context.actions.observe(
+                    include_ui_tree=False,
+                    include_screenshot=False,
+                )
+                if current is not None and self.dismiss_optional_permission(context, current):
+                    self.emit_popup_dismissed(context, _OPTIONAL_PERMISSION_DENY.target_id)
+                    context.timing.operation_delay()
+                    continue
+            if observation is not None:
+                permission_id = self.dismiss_optional_permission(context, observation)
+                if permission_id is not None:
+                    self.emit_popup_dismissed(context, permission_id)
+                    context.timing.operation_delay()
+                    continue
             if self._foreground_left_app(observation):
                 if relaunched:
                     return False
@@ -183,7 +256,10 @@ class NavigationController:
                 self.emit_popup_dismissed(context, target_id)
                 context.timing.operation_delay()
             return True
-        if not self.go_home(context, select_tab=True):
+        if not self.go_home(
+            context,
+            select_tab=navigation.select_home_tab_before_task,
+        ):
             return False
         if not context.actions.tap_target(navigation.task_entry, timeout=2.0):
             return False
@@ -259,6 +335,28 @@ class NavigationController:
             if target_id is not None:
                 return target_id
         return None
+
+    @classmethod
+    def dismiss_optional_permission(
+        cls,
+        context: AppContext,
+        observation: Observation,
+    ) -> str | None:
+        """只拒绝系统权限弹窗或明确的已安装应用列表请求。"""
+
+        system_dialog = observation.activity.package_name in _SYSTEM_PERMISSION_PACKAGES
+        current = observation
+        if system_dialog:
+            native = context.actions.observe(
+                include_ui_tree=True,
+                include_screenshot=False,
+                ui_tree_source=UiTreeSource.SYSTEM,
+            )
+            if native is not None:
+                current = native
+        elif not context.actions.resolve_in(_INSTALLED_APPS_PERMISSION, current).found:
+            return None
+        return cls.tap_first_in(context, (_OPTIONAL_PERMISSION_DENY,), current)
 
     def emit_popup_dismissed(self, context: AppContext, target_id: str) -> None:
         context.emit(

@@ -144,7 +144,7 @@ class PageMatcherTest(unittest.TestCase):
 
     def test_visual_page_signal_runs_only_as_fallback(self):
         session = StubSession()
-        profile = ObservationProfile(UiTreeSource.INSTRUMENTATION, screenshot_max_size=720)
+        profile = ObservationProfile(UiTreeSource.APPLICATION, screenshot_max_size=720)
         _, actions = create_actions(session, ocr=StubOcr(), profile=profile)
         marker = TargetSpec(
             "OCR页面",
@@ -155,7 +155,7 @@ class PageMatcherTest(unittest.TestCase):
 
         self.assertTrue(result.matched)
         self.assertEqual([False, True], [item.include_screenshot for item in session.requests])
-        self.assertTrue(all(item.ui_tree_source is UiTreeSource.INSTRUMENTATION for item in session.requests))
+        self.assertTrue(all(item.ui_tree_source is UiTreeSource.APPLICATION for item in session.requests))
         self.assertEqual(720, session.requests[-1].screenshot_max_size)
 
 
