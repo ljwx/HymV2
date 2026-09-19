@@ -130,6 +130,13 @@ def qutoutiao_spec() -> AppSpec:
     ad_close = target(
         "趣头条广告关闭",
         layout_locator("广告关闭结构", IMAGE, position=(0.9108, 0.0696), size=(0.0433, 0.0194)),
+        layout_locator(
+            "新版广告关闭结构",
+            IMAGE,
+            position=(0.9333, 0.0906),
+            size=(0.0630, 0.0291),
+            priority=11,
+        ),
     )
     ad = AdSpec(
         start_markers=(
