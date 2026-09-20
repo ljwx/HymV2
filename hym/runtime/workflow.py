@@ -202,7 +202,10 @@ class WorkflowExecutor:
             f"{definition.display_name}执行结束",
             workflow_id=definition.workflow_id,
             status=status.value,
-            data={"step_count": len(execution.results)},
+            data={
+                "step_count": len(execution.results),
+                "duration_ms": max(0, int((finished - (execution.started_at or finished)).total_seconds() * 1000)),
+            },
         )
         self._save_cursor(context, execution, "completed")
         return WorkflowResult(
@@ -381,6 +384,7 @@ class WorkflowExecutor:
             data={
                 "attempts": attempts,
                 "consecutive_failure_count": failure_count,
+                "duration_ms": max(0, int((finished - started).total_seconds() * 1000)),
                 **outcome.outputs,
             },
             artifacts=artifacts,

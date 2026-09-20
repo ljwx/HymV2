@@ -206,6 +206,7 @@ def xifan_theater_spec() -> AppSpec:
             ),
             available_region=Rect(0.05, 0.11, 0.42, 0.23),
             minimum_region=Rect(0.04, 0.28, 0.96, 0.53),
+            details_region=Rect(0.03, 0.25, 0.97, 0.88),
         ),
         ad=None,
         ad_entry=None,

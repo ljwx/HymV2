@@ -247,6 +247,7 @@ def hema_theater_spec() -> AppSpec:
             ),
             available_region=Rect(0.48, 0.11, 0.86, 0.23),
             minimum_region=Rect(0.04, 0.29, 0.96, 0.49),
+            details_region=Rect(0.03, 0.26, 0.97, 0.88),
         ),
         ad=None,
         ad_entry=None,

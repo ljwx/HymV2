@@ -359,6 +359,7 @@ def kuaishou_spec() -> AppSpec:
             ),
             available_region=Rect(0.05, 0.13, 0.45, 0.28),
             minimum_region=Rect(0.05, 0.39, 0.95, 0.58),
+            details_region=Rect(0.03, 0.34, 0.97, 0.88),
         ),
         ad=ad,
         # 任务页右下角宝箱领取后原位变成倒计时，不会稳定出现到账弹窗。

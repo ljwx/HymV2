@@ -382,6 +382,7 @@ def douyin_spec() -> AppSpec:
             ),
             available_region=Rect(0.25, 0.20, 0.72, 0.36),
             minimum_region=Rect(0.05, 0.45, 0.95, 0.72),
+            details_region=Rect(0.03, 0.38, 0.97, 0.90),
         ),
         ad=ad,
         duration_reward=DurationRewardSpec(

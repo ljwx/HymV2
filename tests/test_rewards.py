@@ -126,6 +126,7 @@ class RewardTaskTest(unittest.TestCase):
             "value": {"value": "约0.0元", "artifacts": []},
             "recorded_at": "2026-09-17T12:00:00+08:00",
         }
+        current.option = lambda key, default: False if key == "record_balance_each_run" else default
 
         outcome = BalanceTask(qutoutiao_spec(), lambda _: False).run(current)
 
@@ -181,7 +182,11 @@ class RewardTaskTest(unittest.TestCase):
                 recognize=lambda frame: (
                     OcrText("3.20", Rect(0.10, 0.18, 0.25, 0.22), 0.99, "test"),
                     OcrText("0.5元", Rect(0.10, 0.42, 0.25, 0.47), 0.99, "test"),
+                    OcrText("连续签到3天", Rect(0.08, 0.48, 0.27, 0.52), 0.99, "test"),
                     OcrText("15元", Rect(0.40, 0.42, 0.55, 0.47), 0.99, "test"),
+                    OcrText("需完成实名认证", Rect(0.37, 0.48, 0.61, 0.52), 0.99, "test"),
+                    OcrText("30元", Rect(0.70, 0.42, 0.84, 0.47), 0.99, "test"),
+                    OcrText("仅限新用户", Rect(0.68, 0.48, 0.88, 0.52), 0.99, "test"),
                 )
             ),
             emit=lambda *args, **kwargs: events.append((args, kwargs)),
@@ -194,6 +199,12 @@ class RewardTaskTest(unittest.TestCase):
         self.assertEqual(320, snapshot["available_amount_minor"])
         self.assertEqual(50, snapshot["minimum_amount_minor"])
         self.assertTrue(snapshot["eligible"])
+        self.assertEqual([50, 1500, 3000], [tier["amount_minor"] for tier in snapshot["tiers"]])
+        self.assertEqual("连续签到3天", snapshot["tiers"][0]["requirement"])
+        self.assertEqual("需完成实名认证", snapshot["tiers"][1]["requirement"])
+        self.assertEqual("仅限新用户", snapshot["tiers"][2]["requirement"])
+        self.assertTrue(snapshot["tiers"][0]["balance_eligible"])
+        self.assertFalse(snapshot["tiers"][1]["balance_eligible"])
         self.assertEqual("reward.withdrawal.snapshot", events[0][0][0])
 
     def test_withdrawal_navigation_failure_is_reported_but_does_not_fail_workflow(self):

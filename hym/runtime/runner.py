@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 from hym.adapters.airtest_poco import AirtestPocoDeviceFactory
@@ -266,6 +267,7 @@ class DeviceWorker:
         sequential: bool = False,
     ) -> str:
         trace_id = uuid4().hex
+        cycle_started = self.clock.now()
         self._cycle_stopped = False
         self._cycle_business_date = self.clock.now().astimezone().date()
         self._emit_worker_event(
@@ -425,7 +427,29 @@ class DeviceWorker:
                     "应用任务结束",
                     f"{job.plugin.spec.display_name}本轮执行结束",
                     status=workflow_result.status.value,
-                    data={"workflow_id": workflow_result.workflow_id},
+                    data={
+                        "workflow_id": workflow_result.workflow_id,
+                        "duration_ms": max(
+                            0,
+                            int((workflow_result.finished_at - workflow_result.started_at).total_seconds() * 1000),
+                        ),
+                        "step_total": len(workflow_result.steps),
+                        "step_succeeded": sum(
+                            step.status in {WorkflowStatus.SUCCESS, WorkflowStatus.ALREADY_DONE}
+                            for step in workflow_result.steps
+                        ),
+                        "step_skipped": sum(
+                            step.status is WorkflowStatus.SKIPPED for step in workflow_result.steps
+                        ),
+                        "step_failed": sum(
+                            step.status not in {
+                                WorkflowStatus.SUCCESS,
+                                WorkflowStatus.ALREADY_DONE,
+                                WorkflowStatus.SKIPPED,
+                            }
+                            for step in workflow_result.steps
+                        ),
+                    },
                 )
                 if workflow_result.status in {
                     WorkflowStatus.SUCCESS,
@@ -481,6 +505,11 @@ class DeviceWorker:
             f"本轮设备任务执行结束，完整完成 {successful_app_count} 个应用，异常 {issue_count} 处",
             level=cycle_level,
             status=cycle_status,
+            data={
+                "duration_ms": max(0, int((self.clock.now() - cycle_started).total_seconds() * 1000)),
+                "app_succeeded": successful_app_count,
+                "issue_count": issue_count,
+            },
         )
         return cycle_status
 
@@ -661,6 +690,7 @@ class DeviceWorker:
         level: EventLevel = EventLevel.INFO,
         status: str | None = None,
         app_id: str | None = None,
+        data: Mapping[str, Any] | None = None,
     ) -> None:
         self.events.emit(
             AutomationEvent(
@@ -673,5 +703,6 @@ class DeviceWorker:
                 status=status,
                 message=message,
                 app_id=app_id,
+                data=data or {},
             )
         )

@@ -241,7 +241,9 @@ class BalanceTask:
 
     def run(self, context: AppContext) -> StepOutcome:
         recorded = context.daily_value("balance")
-        if _has_recorded_balance(recorded):
+        option = getattr(context, "option", lambda _key, default: default)
+        record_each_run = bool(option("record_balance_each_run", True))
+        if not record_each_run and _has_recorded_balance(recorded):
             return StepOutcome(WorkflowStatus.ALREADY_DONE, "今天已经记录过余额")
         spec = self.app_spec.balance
         if spec is None:
@@ -277,9 +279,24 @@ class BalanceTask:
         if spec.screenshot_only or re.search(r"\d", value) is None:
             artifacts = context.diagnostics.capture(f"{self.app_spec.identity.app_id}-balance")
             value = "页面截图"
+        amount_minor = _amount_minor(value, spec.scale)
+        balances = [] if amount_minor is None else [
+            {
+                "asset_key": spec.asset_key,
+                "asset_label": spec.asset_label,
+                "amount_minor": amount_minor,
+                "scale": spec.scale,
+                "unit": spec.unit,
+            }
+        ]
+        data = {
+            "business_date": context.business_date.isoformat(),
+            "value": value,
+            "balances": balances,
+        }
         context.mark_daily(
             "balance",
-            {"value": value, "artifacts": [artifact.uri for artifact in artifacts]},
+            {**data, "artifacts": [artifact.uri for artifact in artifacts]},
         )
         context.emit(
             "reward.balance.recorded",
@@ -288,7 +305,7 @@ class BalanceTask:
             workflow_id="daily",
             step_id="记录余额",
             status="success",
-            data={"business_date": context.business_date.isoformat(), "value": value},
+            data=data,
             artifacts=artifacts,
         )
         if spec.close_with_back:
@@ -296,7 +313,7 @@ class BalanceTask:
         return StepOutcome(
             WorkflowStatus.SUCCESS,
             "余额记录完成",
-            {"value": value},
+            {"value": value, "balances": balances},
             artifacts,
         )
 
@@ -392,7 +409,7 @@ def _format_minor(value: int, scale: int) -> str:
 
 @dataclass(frozen=True, slots=True)
 class WithdrawalTask:
-    """低频读取提现页，只记录余额、门槛和是否可提现。"""
+    """低频读取提现页，记录余额、提现档位及页面声明的要求。"""
 
     app_spec: AppSpec
     go_task_page: TaskPageNavigator
@@ -439,11 +456,21 @@ class WithdrawalTask:
             return self._unavailable(context, f"提现页面 OCR 失败: {error}")
 
         available = _first_amount_in_region(texts, spec.available_region, spec.scale)
+        tiers, notes = _withdrawal_details(
+            texts,
+            spec.details_region or spec.minimum_region,
+            spec.available_region,
+            available,
+            spec.scale,
+            spec.max_tiers,
+        )
         minimum = spec.minimum_amount_minor
         if spec.minimum_region is not None:
             detected = _minimum_amount_in_region(texts, spec.minimum_region, spec.scale)
             if detected is not None:
                 minimum = detected
+        if tiers:
+            minimum = min(item["amount_minor"] for item in tiers)
         if available is None:
             self._close(context, spec.close_back_count)
             return self._unavailable(context, "没有识别到可提现余额")
@@ -456,6 +483,8 @@ class WithdrawalTask:
             "scale": spec.scale,
             "unit": spec.unit,
             "eligible": eligible,
+            "tiers": tiers,
+            "notes": notes,
         }
         context.state.set(
             context.namespace,
@@ -465,6 +494,8 @@ class WithdrawalTask:
         summary = f"可提现 {_format_minor(available, spec.scale)}{spec.unit}"
         if minimum is not None:
             summary += f"，门槛 {_format_minor(minimum, spec.scale)}{spec.unit}"
+        if tiers:
+            summary += f"，已识别 {len(tiers)} 个档位"
         context.emit(
             "reward.withdrawal.snapshot",
             "提现信息更新",
@@ -500,7 +531,7 @@ class WithdrawalTask:
         except (KeyError, TypeError, ValueError):
             return False
         age = (context.business_date - captured_date).days
-        return 0 <= age < spec.refresh_days
+        return 0 <= age < spec.refresh_days and "tiers" in value and "notes" in value
 
     @staticmethod
     def _close(context: AppContext, count: int) -> None:
@@ -530,6 +561,103 @@ def _minimum_amount_in_region(texts, region, scale: int) -> int | None:
         if amount is not None and amount >= 0
     }
     return min(amounts) if amounts else None
+
+
+_TIER_AMOUNT = re.compile(r"(?:[¥￥]\s*)?(\d[\d,]*(?:\.\d+)?)\s*元")
+_REQUIREMENT_WORDS = re.compile(
+    r"需|须|满|连续|签到|天|次|新人|新用户|限|邀请|审核|到账|实名|银行卡|条件|要求"
+)
+_GENERIC_WITHDRAWAL_TEXT = re.compile(r"^(?:立即)?(?:去)?提现$|^选择$|^可提现$")
+
+
+def _withdrawal_details(
+    texts,
+    region,
+    available_region,
+    available: int | None,
+    scale: int,
+    max_tiers: int,
+) -> tuple[list[dict[str, object]], list[str]]:
+    if region is None:
+        return [], []
+    items = sorted(
+        (
+            item
+            for item in texts
+            if _point_in_region(item.bounds.center, region)
+            and not _point_in_region(item.bounds.center, available_region)
+        ),
+        key=lambda item: (item.bounds.top, item.bounds.left),
+    )
+    amount_items: list[tuple[object, int]] = []
+    seen_amounts: set[int] = set()
+    for item in items:
+        match = _TIER_AMOUNT.search(_clean_ocr_text(item.text))
+        amount = _amount_minor(match.group(1), scale) if match is not None else None
+        if amount is None or amount < 0 or amount in seen_amounts:
+            continue
+        seen_amounts.add(amount)
+        amount_items.append((item, amount))
+    amount_items = sorted(amount_items, key=lambda pair: pair[1])[:max_tiers]
+
+    assigned_ids: set[int] = set()
+    tiers: list[dict[str, object]] = []
+    amount_item_ids = {id(item) for item, _ in amount_items}
+    for amount_item, amount in amount_items:
+        requirement_parts: list[str] = []
+        for item in items:
+            if id(item) in amount_item_ids:
+                continue
+            text = _clean_ocr_text(item.text)
+            if not text or _GENERIC_WITHDRAWAL_TEXT.fullmatch(text):
+                continue
+            center = item.bounds.center
+            amount_center = amount_item.bounds.center
+            nearest = min(
+                amount_items,
+                key=lambda pair: abs(pair[0].bounds.center.x - center.x),
+            )[0]
+            if nearest is not amount_item:
+                continue
+            if not amount_item.bounds.top - 0.03 <= center.y <= amount_item.bounds.bottom + 0.20:
+                continue
+            requirement_parts.append(text)
+            assigned_ids.add(id(item))
+        requirement = _join_detail_text(requirement_parts)
+        tiers.append(
+            {
+                "amount_minor": amount,
+                "balance_eligible": available is not None and available >= amount,
+                "requirement": requirement,
+            }
+        )
+
+    notes = []
+    for item in items:
+        if id(item) in amount_item_ids or id(item) in assigned_ids:
+            continue
+        text = _clean_ocr_text(item.text)
+        if text and _REQUIREMENT_WORDS.search(text):
+            notes.append(text)
+    return tiers, _unique_texts(notes, limit=3)
+
+
+def _clean_ocr_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip()[:120]
+
+
+def _join_detail_text(values: Sequence[str]) -> str:
+    return " · ".join(_unique_texts(values, limit=3))[:240]
+
+
+def _unique_texts(values: Sequence[str], *, limit: int) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        if value and value not in result:
+            result.append(value)
+        if len(result) >= limit:
+            break
+    return result
 
 
 def _point_in_region(point, region) -> bool:

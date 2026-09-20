@@ -225,6 +225,7 @@ def toutiao_lite_spec() -> AppSpec:
             ),
             available_region=Rect(0.27, 0.20, 0.72, 0.38),
             minimum_region=Rect(0.03, 0.42, 0.95, 0.67),
+            details_region=Rect(0.03, 0.38, 0.97, 0.90),
             close_back_count=2,
         ),
         ad=ad,

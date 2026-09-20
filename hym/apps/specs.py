@@ -102,6 +102,10 @@ class BalanceAssetSpec:
 class BalanceSpec:
     balance_target: TargetSpec | None = None
     assets: tuple[BalanceAssetSpec, ...] = ()
+    asset_key: str = "balance"
+    asset_label: str = "余额"
+    scale: int = 2
+    unit: str = "元"
     enter_target: TargetSpec | None = None
     page_marker: TargetSpec | None = None
     screenshot_only: bool = False
@@ -115,17 +119,20 @@ class BalanceSpec:
         keys = [asset.asset_key for asset in self.assets]
         if len(keys) != len(set(keys)):
             raise ValueError("余额字段标识不能重复")
+        if not 0 <= self.scale <= 6:
+            raise ValueError("余额金额小数位必须位于 0 到 6 之间")
         if self.enter_wait_seconds is not None and self.enter_wait_seconds < 0:
             raise ValueError("余额页面等待时间不能小于零")
 
 
 @dataclass(frozen=True, slots=True)
 class WithdrawalSpec:
-    """声明提现页入口和金额区域；采集端只上报结构化金额。"""
+    """声明提现页入口和金额区域；采集端只上报结构化档位与要求。"""
 
     entry_sequence: tuple[TargetSpec, ...]
     available_region: Rect
     minimum_region: Rect | None = None
+    details_region: Rect | None = None
     minimum_amount_minor: int | None = None
     dismiss_popups: tuple[PopupDismissSpec, ...] = ()
     scale: int = 2
@@ -133,6 +140,7 @@ class WithdrawalSpec:
     refresh_days: int = 1
     page_wait_seconds: float = 4.0
     close_back_count: int = 1
+    max_tiers: int = 3
 
     def __post_init__(self) -> None:
         if not self.entry_sequence:
@@ -147,6 +155,8 @@ class WithdrawalSpec:
             raise ValueError("提现页面等待时间不能小于零")
         if self.close_back_count < 0:
             raise ValueError("提现页面返回次数不能小于零")
+        if not 1 <= self.max_tiers <= 6:
+            raise ValueError("提现档位采集数量必须位于 1 到 6 之间")
 
 
 @dataclass(frozen=True, slots=True)

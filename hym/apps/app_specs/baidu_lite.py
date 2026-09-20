@@ -304,6 +304,7 @@ def baidu_lite_spec() -> AppSpec:
             ),
             available_region=Rect(0.25, 0.12, 0.72, 0.25),
             minimum_region=Rect(0.03, 0.30, 0.95, 0.72),
+            details_region=Rect(0.03, 0.27, 0.97, 0.90),
         ),
         ad=ad,
         ad_entry=target(

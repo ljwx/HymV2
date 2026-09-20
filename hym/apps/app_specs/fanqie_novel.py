@@ -262,6 +262,7 @@ def fanqie_novel_spec() -> AppSpec:
             ),
             available_region=Rect(0.05, 0.12, 0.55, 0.28),
             minimum_region=Rect(0.05, 0.30, 0.95, 0.47),
+            details_region=Rect(0.03, 0.28, 0.97, 0.88),
         ),
         ad=ad,
         ad_entry=target(
