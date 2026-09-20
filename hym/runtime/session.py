@@ -180,6 +180,30 @@ class DeviceSession:
         # 文本输入不是幂等动作，断线恢复后不能自动重放。
         return self._perform(lambda device: device.input_text(value), retry_action=False)
 
+    def set_media_volume(self, percent: int) -> ActionResult:
+        return self._perform(
+            lambda device: device.set_media_volume(percent),
+            retry_action=True,
+        )
+
+    def media_playback_state(self, package_name: str) -> int | None:
+        if not self.ensure_healthy():
+            return None
+        try:
+            return self.device.media_playback_state(package_name)
+        except Exception:
+            self._last_health_check = None
+            return None
+
+    def set_screen_brightness(self, percent: int) -> ActionResult:
+        return self._perform(
+            lambda device: device.set_screen_brightness(percent),
+            retry_action=True,
+        )
+
+    def unlock(self) -> ActionResult:
+        return self._perform(lambda device: device.unlock(), retry_action=True)
+
     def _perform(
         self,
         action: Callable[[DevicePort], ActionResult],

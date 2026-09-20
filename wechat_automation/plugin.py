@@ -7,6 +7,7 @@ import hashlib
 import re
 
 from hym.core.control import TaskScope
+from hym.core.events import EventLevel
 from hym.core.models import AppIdentity, OcrText, SystemKey, WorkflowResult, WorkflowStatus
 from hym.core.pages import ObservationProfile
 from hym.core.randomness import bounded_normal_int
@@ -122,7 +123,7 @@ class WechatPlugin:
 
     def _go_home(self, context: AppContext) -> bool:
         for attempt in range(self.settings.root_attempts + 1):
-            if context.actions.match_page(targets.HOME_PAGE, visual_fallback=False).matched:
+            if context.actions.match_page(targets.HOME_PAGE).matched:
                 return True
             if attempt >= self.settings.root_attempts:
                 break
@@ -139,8 +140,18 @@ class WechatPlugin:
         if not context.actions.tap_target(targets.MOMENTS_ENTRY, timeout=2.0):
             return StepOutcome.failure("没有找到朋友圈入口")
         context.timing.wait(self.settings.page_wait_seconds)
-        if not context.actions.match_page(targets.MOMENTS_PAGE_SPEC).matched:
-            return StepOutcome.failure("进入后没有识别到朋友圈页面")
+        moments_reached = False
+        match_message = ""
+        for attempt in range(3):
+            match = context.actions.match_page(targets.MOMENTS_PAGE_SPEC)
+            match_message = match.message
+            if match.matched:
+                moments_reached = True
+                break
+            if attempt < 2:
+                context.timing.wait(self.settings.page_wait_seconds)
+        if not moments_reached:
+            return StepOutcome.failure(f"进入后没有识别到朋友圈页面: {match_message}")
 
         count = bounded_normal_int(
             context.random,
@@ -176,26 +187,26 @@ class WechatPlugin:
         if context.ocr is None:
             return StepOutcome.failure("微信资产采集需要启用 OCR")
         if not self._go_home(context):
-            return StepOutcome.failure("查看零钱时无法返回微信首页")
+            return self._wallet_unavailable(context, "查看零钱时无法返回微信首页")
         if not context.actions.tap_target(targets.ME_TAB, timeout=1.5):
-            return StepOutcome.failure("没有找到我的标签")
+            return self._wallet_unavailable(context, "没有找到我的标签")
         context.timing.operation_delay()
         if context.actions.tap_first(targets.SERVICE_ENTRIES, timeout=2.0) is None:
-            return StepOutcome.failure("没有找到服务或支付入口")
+            return self._wallet_unavailable(context, "没有找到服务或支付入口")
         context.timing.wait(self.settings.page_wait_seconds)
         if not context.actions.tap_target(targets.WALLET_ENTRY, timeout=2.0):
-            return StepOutcome.failure("没有找到钱包入口")
+            return self._wallet_unavailable(context, "没有找到钱包入口")
         context.timing.wait(self.settings.page_wait_seconds)
 
         observation = context.actions.observe(include_ui_tree=False, include_screenshot=True)
         if observation is None or observation.screenshot is None:
-            return StepOutcome.failure("微信钱包页面截图失败")
+            return self._wallet_unavailable(context, "微信钱包页面截图失败")
         wallet_texts = context.ocr.recognize(observation.screenshot)
         if not any(item.text.strip() == "钱包" for item in wallet_texts):
-            return StepOutcome.failure("进入后没有识别到微信钱包页面")
+            return self._wallet_unavailable(context, "进入后没有识别到微信钱包页面")
         balance_minor = _wallet_balance_minor(wallet_texts)
         if balance_minor is None:
-            return StepOutcome.failure("没有识别到微信零钱总额")
+            return self._wallet_unavailable(context, "没有识别到微信零钱总额")
 
         balance = {
             "asset_key": "cash",
@@ -219,11 +230,11 @@ class WechatPlugin:
         )
 
         if not context.actions.tap_target(targets.BILL_ENTRY, timeout=2.0):
-            return StepOutcome.failure("没有找到微信账单入口")
+            return self._wallet_balance_only(context, balance_minor, "没有找到微信账单入口")
         context.timing.wait(self.settings.page_wait_seconds)
         transactions = self._read_transactions(context)
         if not transactions:
-            return StepOutcome.failure("没有识别到微信账单交易")
+            return self._wallet_balance_only(context, balance_minor, "没有识别到微信账单交易")
         bill_data = {
             "business_date": context.business_date.isoformat(),
             "transactions": transactions,
@@ -250,6 +261,37 @@ class WechatPlugin:
             "微信零钱和账单记录完成",
             balance_minor=balance_minor,
             transaction_count=len(transactions),
+        )
+
+    @staticmethod
+    def _wallet_unavailable(context: AppContext, message: str) -> StepOutcome:
+        context.emit(
+            "wechat.wallet.unavailable",
+            "微信资产采集暂不可用",
+            message,
+            level=EventLevel.WARNING,
+            workflow_id="wechat_activity",
+            step_id="查看零钱",
+            status="skipped",
+        )
+        return StepOutcome.skipped(message)
+
+    @staticmethod
+    def _wallet_balance_only(context: AppContext, balance_minor: int, message: str) -> StepOutcome:
+        context.emit(
+            "wechat.bill.unavailable",
+            "微信账单采集暂不可用",
+            message,
+            level=EventLevel.WARNING,
+            workflow_id="wechat_activity",
+            step_id="查看零钱",
+            status="success",
+            data={"balance_minor": balance_minor},
+        )
+        return StepOutcome.success(
+            f"微信零钱已记录，{message}",
+            balance_minor=balance_minor,
+            transaction_count=0,
         )
 
     def _read_transactions(self, context: AppContext) -> list[dict[str, object]]:

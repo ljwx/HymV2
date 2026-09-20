@@ -63,10 +63,45 @@ def fanqie_audio_spec() -> AppSpec:
         coordinate_locator("首页底栏坐标", Point(0.10, 0.97)),
         required=True,
     )
+    home_selected = target(
+        "番茄畅听首页频道已选中",
+        query_locator(
+            "推荐频道选中态",
+            priority=10,
+            options={"contains_text": "推荐", "selected": True},
+        ),
+        query_locator(
+            "直播频道选中态",
+            priority=11,
+            options={"contains_text": "直播", "selected": True},
+        ),
+        query_locator(
+            "听书频道选中态",
+            priority=12,
+            options={"contains_text": "听书", "selected": True},
+        ),
+        query_locator(
+            "短剧频道选中态",
+            priority=13,
+            options={"contains_text": "短剧", "selected": True},
+        ),
+        query_locator(
+            "看书频道选中态",
+            priority=14,
+            options={"contains_text": "看书", "selected": True},
+        ),
+        query_locator(
+            "相声评书频道选中态",
+            priority=15,
+            options={"contains_text": "相声评书", "selected": True},
+        ),
+        required=True,
+    )
     home_marker = target(
         "番茄畅听首页内容",
         id_locator("音频播放卡片ID", prefix + "etq"),
         id_locator("底部播放条ID", prefix + "e_1", priority=11),
+        text_locator("首页推荐文本", "推荐", region=Rect(0.12, 0.08, 0.35, 0.22), priority=20),
         required=True,
     )
     task_entry = target(
@@ -88,16 +123,7 @@ def fanqie_audio_spec() -> AppSpec:
     )
     resume_target = target(
         "番茄畅听恢复播放",
-        query_locator(
-            "底部播放条可点击ID",
-            priority=10,
-            options={"resource_id": prefix + "e_1", "clickable": True},
-        ),
-        query_locator(
-            "音频卡片播放按钮",
-            priority=11,
-            options={"resource_id": prefix + "etq", "clickable": True, "pick": "random"},
-        ),
+        coordinate_locator("底部播放按钮坐标", Point(0.85, 0.892)),
         required=True,
     )
     playing_target = target(
@@ -146,7 +172,8 @@ def fanqie_audio_spec() -> AppSpec:
             home_page=PageSpec(
                 "fanqie_audio.home",
                 package_name,
-                (home_tab, home_marker),
+                (home_selected, home_marker),
+                forbidden_markers=(task_marker,),
                 minimum_markers=2,
                 observation_profile=profile,
             ),
@@ -263,26 +290,35 @@ def fanqie_audio_spec() -> AppSpec:
 
 @dataclass(frozen=True, slots=True)
 class FanqieAudioPlayback:
-    """播放条状态不完整时，允许从当前书籍或播放条恢复一次。"""
+    """区分播放/暂停状态；播放条无稳定 ID 时点击实机播放按钮。"""
 
     def ensure_playing(self, context: AppContext, spec: AudioContentSpec) -> bool:
+        package_name = "com.xs.fm"
+        state = context.session.media_playback_state(package_name)
+        if state in {3, 4, 5, 6, 8}:
+            return True
         for attempt in range(2):
             observation = context.actions.observe_for(
-                (spec.playing_target, spec.resume_target, spec.session_marker),
+                (
+                    spec.playing_target,
+                    spec.resume_target,
+                    spec.session_marker,
+                ),
                 include_screenshot=False,
             )
             if observation is not None:
-                session = context.actions.resolve_in(spec.session_marker, observation)
-                if session.found:
-                    if context.actions.resolve_in(spec.playing_target, observation).found:
-                        return True
-                    # 番茄畅听会自动续播；播放条已出现时不反向点击成暂停。
+                if context.actions.resolve_in(spec.playing_target, observation).found:
                     return True
                 resume = context.actions.resolve_in(spec.resume_target, observation)
                 if resume.found and resume.target is not None:
                     if context.actions.tap_resolved(resume.target):
                         context.timing.operation_delay()
-                        return True
+                        state = context.session.media_playback_state(package_name)
+                        if state in {3, 4, 5, 6, 8}:
+                            return True
+                        if state is None:
+                            # 老设备没有媒体会话信息时保留 UI 兼容路径。
+                            return True
             if attempt == 0:
                 context.timing.operation_delay()
         return False

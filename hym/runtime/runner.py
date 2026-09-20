@@ -161,21 +161,64 @@ class DeviceWorker:
                         self.session.close()
 
                 next_cycle_at = self.clock.now().timestamp()
+                if self.remote_runtime:
+                    self.remote_runtime.report_state("idle", force=True)
                 while True:
                     trace_id = uuid4().hex
-                    pause = self.remote_runtime.poll_pause() if self.remote_runtime else None
-                    if pause is not None:
-                        self.remote_runtime.wait(pause, trace_id=trace_id)
-                        continue
+                    control = self.remote_runtime.poll_control() if self.remote_runtime else None
+                    if control is not None:
+                        if control.desired_state == "stopped":
+                            self.remote_runtime.report_state("stopped")
+                            command = self.remote_runtime.claim_command()
+                            if command is not None:
+                                if command.scope in {
+                                    TaskScope.DEVICE_VOLUME,
+                                    TaskScope.SCREEN_BRIGHTNESS,
+                                    TaskScope.DEVICE_HOME,
+                                    TaskScope.DEVICE_LOCK,
+                                    TaskScope.DEVICE_UNLOCK,
+                                }:
+                                    self.remote_runtime.run_command(
+                                        command,
+                                        session=self.session,
+                                        run_cycle=self._run_cycle,
+                                        loop_interval_seconds=self.settings.loop_interval_seconds,
+                                    )
+                                else:
+                                    self.remote_control.complete_command(
+                                        command,
+                                        succeeded=False,
+                                        message="设备已停止，请先恢复后再执行任务",
+                                    )
+                                self.remote_runtime.report_state("stopped", force=True)
+                                continue
+                            self.clock.sleep(self.settings.reporting.control_poll_interval_seconds)
+                            continue
+                        if control.desired_state == "paused":
+                            self.remote_runtime.wait(control, trace_id=trace_id)
+                            self.remote_runtime.report_state("idle")
+                            continue
+                        self.remote_runtime.report_state("idle")
 
                     command = self.remote_runtime.claim_command() if self.remote_runtime else None
                     if command is not None:
+                        self.remote_runtime.report_state("running")
                         self.remote_runtime.run_command(
                             command,
                             session=self.session,
                             run_cycle=self._run_cycle,
                             loop_interval_seconds=self.settings.loop_interval_seconds,
                         )
+                        after = self.remote_runtime.poll_control(force=True)
+                        self.remote_runtime.report_state(
+                            "stopped" if after is not None and after.desired_state == "stopped" else "idle"
+                        )
+                        next_cycle_at = self.clock.now().timestamp() + self.settings.loop_interval_seconds
+                        continue
+
+                    # 启用远程控制时，running 表示设备可接单；具体任务必须由命令队列触发。
+                    if self.remote_runtime is not None:
+                        self.clock.sleep(self.settings.reporting.control_poll_interval_seconds)
                         continue
 
                     now = self.clock.now().timestamp()
@@ -183,9 +226,16 @@ class DeviceWorker:
                         if not self.session.connect():
                             return 2
                         try:
+                            if self.remote_runtime:
+                                self.remote_runtime.report_state("running")
                             self._run_cycle()
                         finally:
                             self.session.close()
+                            if self.remote_runtime:
+                                after = self.remote_runtime.poll_control(force=True)
+                                self.remote_runtime.report_state(
+                                    "stopped" if after is not None and after.desired_state == "stopped" else "idle"
+                                )
                         next_cycle_at = self.clock.now().timestamp() + self.settings.loop_interval_seconds
                         continue
 
@@ -216,6 +266,7 @@ class DeviceWorker:
         sequential: bool = False,
     ) -> str:
         trace_id = uuid4().hex
+        self._cycle_stopped = False
         self._cycle_business_date = self.clock.now().astimezone().date()
         self._emit_worker_event(
             trace_id,
@@ -408,6 +459,15 @@ class DeviceWorker:
                 job.suspended = True
                 current_index = self._handle_interruption(jobs, current_index, request)
 
+        if self._cycle_stopped:
+            self._emit_worker_event(
+                trace_id,
+                "runtime.cycle.stopped",
+                "执行轮次已停止",
+                "设备已在安全点停止所有任务",
+                status="cancelled",
+            )
+            return "cancelled"
         issue_count += self._finish_cycle(jobs, trace_id)
         cycle_status = "success"
         cycle_level = EventLevel.INFO
@@ -464,7 +524,7 @@ class DeviceWorker:
         jobs: list[_AppJob],
         current_index: int,
         request: InterruptionRequest,
-    ) -> int:
+    ) -> int | None:
         job = jobs[current_index]
         context = job.context
         if request.kind is InterruptionKind.USER_PAUSE:
@@ -472,6 +532,21 @@ class DeviceWorker:
             if remote_runtime is not None:
                 remote_runtime.wait(remote_runtime.state_from(request), context=context)
             return current_index
+        if request.kind is InterruptionKind.USER_STOP:
+            context.actions.press(SystemKey.HOME)
+            context.emit(
+                "runtime.control.stop.finished",
+                "设备任务停止",
+                "已在安全点停止当前轮次并返回桌面",
+                status="cancelled",
+            )
+            for candidate in jobs:
+                candidate.completed = True
+            self._cycle_stopped = True
+            remote_runtime = getattr(self, "remote_runtime", None)
+            if remote_runtime is not None:
+                remote_runtime.report_state("stopped", force=True)
+            return None
         candidates = [
             index
             for index, candidate in enumerate(jobs)
@@ -549,7 +624,32 @@ class DeviceWorker:
         jobs: list[_AppJob],
         current_index: int,
     ) -> int | None:
-        return rest_before_next_app(self.clock, jobs, current_index)
+        return rest_before_next_app(
+            self.clock,
+            jobs,
+            current_index,
+            on_tick=lambda: self._continue_app_rest(jobs),
+        )
+
+    def _continue_app_rest(self, jobs: list[_AppJob]) -> bool:
+        remote_runtime = getattr(self, "remote_runtime", None)
+        if remote_runtime is None:
+            return True
+        state = remote_runtime.poll_control()
+        if state is None or state.desired_state == "running":
+            return True
+        if state.desired_state == "paused":
+            remote_runtime.wait(state)
+            state = remote_runtime.poll_control(force=True)
+            if state is None or state.desired_state == "running":
+                return True
+        if state.desired_state == "stopped":
+            for job in jobs:
+                job.completed = True
+            self._cycle_stopped = True
+            remote_runtime.report_state("stopped", force=True)
+            return False
+        return True
 
     def _emit_worker_event(
         self,

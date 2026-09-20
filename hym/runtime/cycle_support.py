@@ -74,7 +74,13 @@ def next_pending_index(jobs: Sequence[Any], current_index: int) -> int | None:
     return None
 
 
-def rest_before_next_app(clock, jobs: Sequence[Any], current_index: int) -> int | None:
+def rest_before_next_app(
+    clock,
+    jobs: Sequence[Any],
+    current_index: int,
+    *,
+    on_tick: Callable[[], bool] | None = None,
+) -> int | None:
     """完整结束一个 App 后回到桌面休息，再调度下一个。"""
 
     next_index = next_pending_index(jobs, current_index)
@@ -102,7 +108,21 @@ def rest_before_next_app(clock, jobs: Sequence[Any], current_index: int) -> int 
         data={"wait_seconds": round(wait_seconds, 2), "next_app_id": target.plugin.app_id},
     )
     context.actions.press(SystemKey.HOME)
-    clock.sleep(wait_seconds)
+    remaining = wait_seconds
+    while remaining > 0:
+        if on_tick is not None and not on_tick():
+            context.emit(
+                "runtime.app_rest.interrupted",
+                "应用间休息已中断",
+                "收到停止指令，取消后续应用任务",
+                workflow_id=current.execution.definition.workflow_id,
+                status="cancelled",
+                data={"next_app_id": target.plugin.app_id},
+            )
+            return None
+        sleep_seconds = min(10.0, remaining)
+        clock.sleep(sleep_seconds)
+        remaining -= sleep_seconds
     context.emit(
         "runtime.app_rest.finished",
         "应用间休息结束",

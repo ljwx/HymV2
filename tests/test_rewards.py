@@ -3,8 +3,10 @@ from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
 from hym.apps.app_specs import kuaishou_spec, qutoutiao_spec
+from hym.apps.app_specs.toutiao_lite import ToutiaoNovelBonusTask
 from hym.core.models import ActivityInfo, ImageFrame, Observation, OcrText, Rect, WorkflowStatus
-from hym.runtime.rewards import BalanceTask, DurationRewardTask, WithdrawalTask
+from hym.runtime.context import DailyActionStatus
+from hym.runtime.rewards import AdRewardTask, BalanceTask, CheckInTask, DurationRewardTask, WithdrawalTask
 
 
 class StubActions:
@@ -65,6 +67,50 @@ def context(actions):
 
 
 class RewardTaskTest(unittest.TestCase):
+    def test_optional_reward_navigation_failures_are_skipped(self):
+        events = []
+        current = SimpleNamespace(
+            daily_value=lambda key: None,
+            daily_action_status=lambda key: DailyActionStatus.NOT_STARTED,
+            emit=lambda *args, **kwargs: events.append((args, kwargs)),
+        )
+
+        outcomes = (
+            CheckInTask(kuaishou_spec(), lambda _: False).run(current),
+            BalanceTask(kuaishou_spec(), lambda _: False).run(current),
+            DurationRewardTask(kuaishou_spec(), lambda _: False).run(current),
+        )
+
+        self.assertTrue(all(outcome.status is WorkflowStatus.SKIPPED for outcome in outcomes))
+        self.assertEqual(3, len(events))
+        self.assertTrue(all(event[0][0] == "reward.optional.unavailable" for event in events))
+
+    def test_toutiao_novel_navigation_failure_is_an_optional_reward(self):
+        events = []
+        current = SimpleNamespace(
+            random=SimpleNamespace(random=lambda: 0.0),
+            option=lambda key, default: default,
+            emit=lambda *args, **kwargs: events.append((args, kwargs)),
+        )
+
+        outcome = ToutiaoNovelBonusTask(lambda _: False).run(current)
+
+        self.assertEqual(WorkflowStatus.SKIPPED, outcome.status)
+        self.assertEqual("reward.optional.unavailable", events[0][0][0])
+        self.assertEqual("skipped", events[0][1]["status"])
+
+    def test_ad_reward_success_is_not_downgraded_when_later_entry_is_unavailable(self):
+        outcome = AdRewardTask._summarize(completed=1, uncertain=0, failed=1, total=2)
+
+        self.assertEqual(WorkflowStatus.SUCCESS, outcome.status)
+        self.assertEqual(1, outcome.outputs["completed"])
+        self.assertEqual(1, outcome.outputs["failed"])
+
+    def test_ad_reward_with_no_available_entry_is_skipped(self):
+        outcome = AdRewardTask._summarize(completed=0, uncertain=0, failed=2, total=2)
+
+        self.assertEqual(WorkflowStatus.SKIPPED, outcome.status)
+
     def test_kuaishou_balance_reads_both_assets_from_task_page(self):
         spec = kuaishou_spec()
         balance = spec.balance
@@ -149,6 +195,22 @@ class RewardTaskTest(unittest.TestCase):
         self.assertEqual(50, snapshot["minimum_amount_minor"])
         self.assertTrue(snapshot["eligible"])
         self.assertEqual("reward.withdrawal.snapshot", events[0][0][0])
+
+    def test_withdrawal_navigation_failure_is_reported_but_does_not_fail_workflow(self):
+        events = []
+        current = SimpleNamespace(
+            state=StubState(),
+            namespace="device-1:kuaishou",
+            business_date=date(2026, 9, 19),
+            ocr=object(),
+            emit=lambda *args, **kwargs: events.append((args, kwargs)),
+        )
+
+        outcome = WithdrawalTask(kuaishou_spec(), lambda _: False).run(current)
+
+        self.assertEqual(WorkflowStatus.SKIPPED, outcome.status)
+        self.assertEqual("reward.withdrawal.unavailable", events[0][0][0])
+        self.assertEqual("skipped", events[0][1]["status"])
 
 
 if __name__ == "__main__":

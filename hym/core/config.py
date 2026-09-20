@@ -20,10 +20,10 @@ class BehaviorSettings:
     operation_delay_center: float = 1.5
     operation_delay_max: float = 2.5
     operation_delay_stddev: float = 0.33
-    app_rest_seconds_min: float = 120.0
-    app_rest_seconds_center: float = 210.0
-    app_rest_seconds_max: float = 300.0
-    app_rest_seconds_stddev: float = 30.0
+    app_rest_seconds_min: float = 240.0
+    app_rest_seconds_center: float = 360.0
+    app_rest_seconds_max: float = 480.0
+    app_rest_seconds_stddev: float = 40.0
     touch_duration_min: float = 0.03
     touch_duration_center: float = 0.09
     touch_duration_max: float = 0.15
@@ -35,10 +35,10 @@ class BehaviorSettings:
     swipe_duration_stddev: float = 0.05
     swipe_x_min: float = 0.42
     swipe_x_max: float = 0.58
-    swipe_up_start_min: float = 0.70
-    swipe_up_start_max: float = 0.82
-    swipe_up_end_min: float = 0.25
-    swipe_up_end_max: float = 0.38
+    swipe_up_start_min: float = 0.72
+    swipe_up_start_max: float = 0.84
+    swipe_up_end_min: float = 0.22
+    swipe_up_end_max: float = 0.35
     reward_wait_scale: float = 1.0
 
     def __post_init__(self) -> None:
@@ -171,7 +171,7 @@ class ReportingSettings:
     upload_artifacts: bool = True
     control_enabled: bool = True
     control_timeout_seconds: float = 1.0
-    control_poll_interval_seconds: float = 5.0
+    control_poll_interval_seconds: float = 10.0
 
     def __post_init__(self) -> None:
         if self.enabled and not self.server_url.startswith(("http://", "https://")):

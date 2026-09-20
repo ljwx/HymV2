@@ -191,6 +191,37 @@ class CycleCleanupTest(unittest.TestCase):
         self.assertEqual("runtime.cycle.cleanup.finished", events[0][0][1])
         self.assertEqual("success", events[0][1]["status"])
 
+    def test_app_rest_can_be_interrupted_by_stop_control(self):
+        worker = object.__new__(DeviceWorker)
+        worker.clock = FakeClock()
+        worker._cycle_stopped = False
+        worker.remote_runtime = SimpleNamespace(
+            poll_control=lambda **kwargs: SimpleNamespace(desired_state="stopped"),
+            report_state=lambda *args, **kwargs: None,
+        )
+        first, events = _job("kuaishou")
+        second, _ = _job("douyin")
+        for job in (first, second):
+            job.context.timing = BehaviorTiming(
+                BehaviorSettings(
+                    app_rest_seconds_min=240,
+                    app_rest_seconds_center=360,
+                    app_rest_seconds_max=480,
+                    app_rest_seconds_stddev=40,
+                ),
+                worker.clock,
+                ScriptedRandom([]),
+            )
+
+        next_index = worker._rest_before_next_app([first, second], 0)
+
+        self.assertIsNone(next_index)
+        self.assertTrue(worker._cycle_stopped)
+        self.assertTrue(first.completed)
+        self.assertTrue(second.completed)
+        self.assertEqual([], worker.clock.sleeps)
+        self.assertEqual("runtime.app_rest.interrupted", events[-1][0][0])
+
 
 class DeviceWorkerSchedulingTest(unittest.TestCase):
     def test_worker_switches_apps_and_resumes_original_cursor(self):
@@ -249,7 +280,8 @@ class DeviceWorkerSchedulingTest(unittest.TestCase):
             [("a1", "步骤1"), ("a2", "步骤1"), ("a2", "步骤2"), ("a1", "步骤2")],
             operations,
         )
-        self.assertEqual([210.0], clock.sleeps)
+        self.assertEqual(360.0, sum(clock.sleeps))
+        self.assertTrue(all(seconds <= 10.0 for seconds in clock.sleeps))
         rest_events = [
             event.event_type
             for event in events.events

@@ -5,13 +5,13 @@
 
 任务与限制：
 - 主线选择小说阅读，不用短视频替代；进入书籍后横向翻页，页数和停留时间均由配置控制。
-- 签到每天只提交一次，只有看到“已签到/明日再来”才记为成功。
+- 签到每天只提交一次，只有看到完成文案或“奖励加倍惊喜”结果层才记为成功。
 - 广告失败只结束当前广告任务，不阻断阅读和余额记录。
 
 页面与状态标记：
 - 首页底栏“书城”，书籍卡片 ID 为 gb1；阅读页优先识别 ReaderActivity，再用文字兜底。
 - 任务入口为底栏“赚钱”，任务页包含“福利中心/签到领金币”。
-- 签到成功弹窗包含“今日签到领N金币”，关闭后任务按钮可能仍显示“去签到”。
+- 签到结果可能由画布渲染“奖励加倍惊喜/N金币打包带走”，需用 OCR 确认并主动领取翻倍视频奖励。
 - 广告只匹配“看视频赚金币”；通用“立即领取”可能是新人礼，不能当广告入口。
 - 同一状态出现新 ID 或文案时，在原 target 内追加 locator，不要改 target_id。
 """
@@ -101,13 +101,42 @@ def fanqie_novel_spec() -> AppSpec:
         text_locator("广告关闭文本", "关闭"),
         coordinate_locator("广告右上角关闭坐标", Point(0.94, 0.06)),
     )
+    check_in_ad_entry = target(
+        "番茄小说签到翻倍视频",
+        ocr_locator(
+            "签到翻倍视频OCR",
+            r"看视频(?:签到|领)?\s*\+?\d+\s*金币",
+            mode="regex",
+            region=Rect(0.18, 0.55, 0.82, 0.72),
+            confidence=0.3,
+        ),
+    )
     ad = AdSpec(
         start_markers=(
-            text_target("番茄小说广告倒计时", "秒后可领奖励", contains=True),
+            target(
+                "番茄小说广告倒计时",
+                text_locator("广告倒计时文本", "秒后可领奖励", contains=True),
+                ocr_locator(
+                    "广告倒计时OCR",
+                    r"\d+秒后可领奖励",
+                    mode="regex",
+                    region=Rect(0.55, 0.02, 0.98, 0.14),
+                    confidence=0.4,
+                ),
+            ),
             text_target("番茄小说广告页面", "广告", contains=True),
         ),
         completion_markers=(
-            text_target("番茄小说广告奖励到账", "领取成功", contains=True),
+            target(
+                "番茄小说广告奖励到账",
+                text_locator("广告领取成功文本", "领取成功", contains=True),
+                ocr_locator(
+                    "广告领取成功OCR",
+                    "领取成功",
+                    region=Rect(0.62, 0.02, 0.98, 0.14),
+                    confidence=0.4,
+                ),
+            ),
             text_target("番茄小说广告奖励获得", "已获得", contains=True),
         ),
         continue_targets=(),
@@ -116,7 +145,7 @@ def fanqie_novel_spec() -> AppSpec:
         final_close_targets=(ad_close,),
         exit_targets=(task_marker, home_tab),
         exit_after_wait_with_back=True,
-        completion_wait_seconds=35.0,
+        completion_wait_seconds=50.0,
     )
 
     return AppSpec(
@@ -164,9 +193,18 @@ def fanqie_novel_spec() -> AppSpec:
                     text_locator("明日再来文本", "明日再来", priority=21),
                     regex_locator("今日签到金币", r"今日签到领\d+金币", priority=22),
                     regex_locator("连续签到天数", r"已连续签到[1-9]\d*天", priority=23),
+                    ocr_locator(
+                        "签到奖励加倍OCR",
+                        r"(?:今日签到领\d+金币|奖励加倍惊喜|\d+金币打包带走)",
+                        mode="regex",
+                        region=Rect(0.08, 0.12, 0.88, 0.38),
+                        confidence=0.4,
+                        priority=24,
+                    ),
                     required=True,
                 ),
             ),
+            post_ad_target=check_in_ad_entry,
             close_target=target(
                 "番茄小说签到结果关闭",
                 coordinate_locator("签到结果底部关闭坐标", Point(0.50, 0.73)),
@@ -302,7 +340,23 @@ def create_plugin() -> ComposedAppPlugin:
         marker=text_target("番茄小说任务欢迎弹窗", "看视频领", contains=True),
         close_target=target(
             "番茄小说任务欢迎弹窗关闭",
-            coordinate_locator("欢迎弹窗底部关闭坐标", Point(0.50, 0.86)),
+            coordinate_locator("欢迎弹窗底部关闭坐标", Point(0.50, 0.75)),
+        ),
+    )
+    jump_game_popup = PopupDismissSpec(
+        marker=target(
+            "番茄小说跳一跳活动弹窗",
+            ocr_locator(
+                "跳一跳活动OCR",
+                r"(?:玩跳一跳|跳一跳赢大额金币)",
+                mode="regex",
+                region=Rect(0.15, 0.14, 0.85, 0.36),
+                confidence=0.4,
+            ),
+        ),
+        close_target=target(
+            "番茄小说跳一跳活弹窗关闭",
+            coordinate_locator("跳一跳底部关闭坐标", Point(0.50, 0.80)),
         ),
     )
     reservation_popup = PopupDismissSpec(
@@ -317,7 +371,9 @@ def create_plugin() -> ComposedAppPlugin:
         navigation=navigation,
         task_page_navigator=TaskPagePopupNavigator(
             navigation,
-            (welcome_popup, reservation_popup),
+            (welcome_popup, jump_game_popup, reservation_popup),
+            max_dismissals=5,
+            check_after_entry=True,
         ),
         content_handler=FanqieNovelContentTask(spec, navigation).run,
     )

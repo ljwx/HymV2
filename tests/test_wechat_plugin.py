@@ -6,10 +6,11 @@ from hym.core.config import AppRunSettings, BehaviorSettings
 from hym.core.events import InMemoryEventSink
 from hym.core.models import ActivityInfo, AppIdentity, DeviceDescriptor, Observation, OcrText, Point, Rect, WorkflowStatus
 from hym.core.pages import PageMatchResult, PageMatchStatus
-from hym.core.targets import ResolveResult, ResolveStatus, ResolvedTarget
+from hym.core.targets import LocatorKind, ResolveResult, ResolveStatus, ResolvedTarget
 from hym.runtime.behavior import BehaviorTiming
 from hym.runtime.context import AppContext
 from hym.testing import DeterministicRandom, FakeClock, InMemoryStateStore
+from wechat_automation import targets
 from wechat_automation.config import ChatSettings, MomentsSettings, WalletSettings, WechatSettings
 from wechat_automation.plugin import WechatPlugin, _bill_transactions, _wallet_balance_minor
 
@@ -33,6 +34,9 @@ class StubActions:
         )
 
     def observe_for(self, targets, *, include_screenshot):
+        return self.observation
+
+    def observe(self, **kwargs):
         return self.observation
 
     def match_page(self, page, **kwargs):
@@ -89,6 +93,47 @@ def create_context():
 
 
 class WechatPluginTest(unittest.TestCase):
+    def test_unavailable_wallet_page_is_reported_as_skipped_warning(self):
+        context, events = create_context()
+        context.ocr = SimpleNamespace(recognize=lambda screenshot: ())
+        context.actions.observation = Observation(
+            "device-1",
+            ActivityInfo("com.tencent.mm", "com.tencent.mm.ui.LauncherUI"),
+            screenshot=b"wallet",
+        )
+        plugin = WechatPlugin(WechatSettings(Path("automation.json")))
+
+        outcome = plugin._capture_wallet(context)
+
+        self.assertEqual(WorkflowStatus.SKIPPED, outcome.status)
+        self.assertEqual("wechat.wallet.unavailable", events.events[-1].event_type)
+        self.assertEqual("skipped", events.events[-1].status)
+
+    def test_wallet_balance_remains_success_when_bill_is_unavailable(self):
+        context, events = create_context()
+        context.ocr = SimpleNamespace(
+            recognize=lambda screenshot: (
+                OcrText("钱包", Rect(0.4, 0.07, 0.6, 0.10), 1.0, "test"),
+                OcrText("¥12.34", Rect(0.7, 0.14, 0.9, 0.17), 1.0, "test"),
+            )
+        )
+        context.actions.observation = Observation(
+            "device-1",
+            ActivityInfo("com.tencent.mm", "com.tencent.mm.ui.LauncherUI"),
+            screenshot=b"wallet",
+        )
+        original_tap_target = context.actions.tap_target
+        context.actions.tap_target = lambda target, timeout=2.0: (
+            False if target is targets.BILL_ENTRY else original_tap_target(target, timeout)
+        )
+        plugin = WechatPlugin(WechatSettings(Path("automation.json")))
+
+        outcome = plugin._capture_wallet(context)
+
+        self.assertEqual(WorkflowStatus.SUCCESS, outcome.status)
+        self.assertEqual(1_234, outcome.outputs["balance_minor"])
+        self.assertEqual("wechat.bill.unavailable", events.events[-1].event_type)
+
     def test_wallet_ocr_builds_balance_and_deduplicatable_bill_rows(self):
         texts = (
             OcrText("钱包", Rect(0.4, 0.07, 0.6, 0.10), 1.0, "test"),
@@ -137,6 +182,12 @@ class WechatPluginTest(unittest.TestCase):
         self.assertTrue(plugin._go_home(context))
         self.assertEqual(3, actions.presses)
         self.assertEqual(4, actions.checks)
+
+    def test_home_page_requires_bottom_navigation_not_only_launcher_activity(self):
+        self.assertEqual((r"LauncherUI$",), targets.HOME_PAGE.activity_patterns)
+        self.assertTrue(
+            all(locator.kind is not LocatorKind.ACTIVITY for locator in targets.HOME_MARKER.locators)
+        )
 
     def test_preview_opens_friend_without_typing_messages(self):
         settings = WechatSettings(

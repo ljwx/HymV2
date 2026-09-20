@@ -77,7 +77,8 @@ class DailyWorkflowBuilder:
                     "浏览内容",
                     self.tasks.content,
                     required=True,
-                    recovery=self.navigation.recover_home,
+                    max_attempts=2,
+                    recovery=self.navigation.hard_restart_app,
                     task_scope=TaskScope.MAIN,
                 )
             )

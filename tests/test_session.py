@@ -43,6 +43,24 @@ class DeviceSessionTest(unittest.TestCase):
         self.assertEqual("input_text", operation.name)
         self.assertEqual({"text_length": 4}, operation.arguments)
 
+    def test_media_playback_state_is_forwarded(self):
+        factory = FakeDeviceFactory()
+        session = DeviceSession(
+            DeviceDescriptor("device-1"),
+            factory,
+            InMemoryEventSink(),
+            FakeClock(),
+            RetrySettings(health_check_interval_seconds=60),
+        )
+        self.assertTrue(session.connect())
+        factory.created[0].media_states["com.example"].append(3)
+
+        self.assertEqual(3, session.media_playback_state("com.example"))
+        self.assertEqual(
+            {"package_name": "com.example"},
+            factory.created[0].operations[-1].arguments,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

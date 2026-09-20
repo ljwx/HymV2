@@ -9,20 +9,24 @@ from hym.apps.app_specs import (
     douyin_spec,
     fanqie_audio_spec,
     fanqie_novel_spec,
+    hema_theater_spec,
     kuaishou_spec,
     qutoutiao_spec,
     toutiao_lite_spec,
     wukong_browser_spec,
+    xifan_theater_spec,
     ximalaya_spec,
 )
 from hym.apps.app_specs.baidu_lite import create_plugin as create_baidu_lite_plugin
 from hym.apps.app_specs.douyin import create_plugin as create_douyin_plugin
 from hym.apps.app_specs.fanqie_audio import create_plugin as create_fanqie_audio_plugin
 from hym.apps.app_specs.fanqie_novel import create_plugin as create_fanqie_novel_plugin
+from hym.apps.app_specs.hema_theater import create_plugin as create_hema_theater_plugin
 from hym.apps.app_specs.kuaishou import create_plugin as create_kuaishou_plugin
 from hym.apps.app_specs.qutoutiao import create_plugin as create_qutoutiao_plugin
 from hym.apps.app_specs.toutiao_lite import create_plugin as create_toutiao_lite_plugin
 from hym.apps.app_specs.wukong_browser import create_plugin as create_wukong_browser_plugin
+from hym.apps.app_specs.xifan_theater import create_plugin as create_xifan_theater_plugin
 from hym.apps.app_specs.ximalaya import create_plugin as create_ximalaya_plugin
 from hym.apps.plugin import (
     ComposedAppPlugin,
@@ -48,6 +52,8 @@ class AppSpecLayoutTest(unittest.TestCase):
             (fanqie_audio_spec, "hym.apps.app_specs.fanqie_audio"),
             (baidu_lite_spec, "hym.apps.app_specs.baidu_lite"),
             (wukong_browser_spec, "hym.apps.app_specs.wukong_browser"),
+            (hema_theater_spec, "hym.apps.app_specs.hema_theater"),
+            (xifan_theater_spec, "hym.apps.app_specs.xifan_theater"),
         )
 
         for factory, module_name in factories:
@@ -68,6 +74,8 @@ class AppSpecLayoutTest(unittest.TestCase):
         self.assertIs(catalog.fanqie_audio_spec, fanqie_audio_spec)
         self.assertIs(catalog.baidu_lite_spec, baidu_lite_spec)
         self.assertIs(catalog.wukong_browser_spec, wukong_browser_spec)
+        self.assertIs(catalog.hema_theater_spec, hema_theater_spec)
+        self.assertIs(catalog.xifan_theater_spec, xifan_theater_spec)
 
     def test_each_app_owns_its_plugin_factory(self):
         factories = (
@@ -80,6 +88,8 @@ class AppSpecLayoutTest(unittest.TestCase):
             (create_fanqie_audio_plugin, "fanqie_audio"),
             (create_baidu_lite_plugin, "baidu_lite"),
             (create_wukong_browser_plugin, "wukong_browser"),
+            (create_hema_theater_plugin, "hema_theater"),
+            (create_xifan_theater_plugin, "xifan_theater"),
         )
 
         for factory, app_id in factories:
@@ -177,6 +187,8 @@ class AppSpecLayoutTest(unittest.TestCase):
                 "fanqie_audio",
                 "baidu_lite",
                 "wukong_browser",
+                "hema_theater",
+                "xifan_theater",
             ),
             create_default_registry().app_ids(),
         )
@@ -205,10 +217,58 @@ class AppSpecLayoutTest(unittest.TestCase):
         self.assertEqual("wukong_browser.main", navigation.home_page.page_id)
 
     def test_baidu_task_entry_does_not_reselect_video_tab(self):
-        navigation = baidu_lite_spec().navigation
+        spec = baidu_lite_spec()
+        navigation = spec.navigation
 
         self.assertFalse(navigation.select_home_tab_before_task)
         self.assertEqual("baidu_lite.main", navigation.home_page.page_id)
+        self.assertEqual(
+            ("打开签到面板", "领取今日奖励"),
+            tuple(stage.stage_id for stage in spec.check_in.stages),
+        )
+        self.assertFalse(spec.check_in.stages[0].commit_action)
+        self.assertTrue(spec.check_in.stages[1].commit_action)
+        self.assertTrue(
+            any(
+                locator.query == "明天"
+                for locator in spec.check_in.success_targets[0].locators
+            )
+        )
+
+    def test_new_theater_apps_use_distinct_welfare_navigation(self):
+        hema = hema_theater_spec().navigation
+        xifan = xifan_theater_spec().navigation
+
+        self.assertEqual("com.dz.hmjc:id/iv_welfare_bottom", hema.task_entry.locators[0].query)
+        self.assertEqual(
+            "com.kwai.theater:id/welfare_pendant_bottom_text",
+            xifan.task_entry.locators[0].query,
+        )
+        self.assertFalse(hema.select_home_tab_before_task)
+        self.assertFalse(xifan.select_home_tab_before_task)
+        self.assertEqual(2, hema.home_page.minimum_markers)
+        self.assertEqual(
+            ("河马剧场短剧流标记", "河马剧场首页标签"),
+            tuple(marker.target_id for marker in hema.home_page.markers),
+        )
+        self.assertEqual(
+            (
+                "河马剧场青少年模式弹层",
+                "河马剧场待领取奖励弹层",
+                "河马剧场短剧流标记",
+            ),
+            tuple(item.marker.target_id for item in hema.home_intercepts),
+        )
+        self.assertEqual(
+            "河马剧场退出沉浸播放器",
+            hema.home_intercepts[-1].close_target.target_id,
+        )
+
+    def test_xifan_check_in_avoids_the_floating_chest(self):
+        action = xifan_theater_spec().check_in.stages[0].action_targets[0]
+
+        self.assertEqual("可领取", action.locators[0].query)
+        self.assertLess(action.locators[0].region.right, 0.5)
 
     def test_kuaishou_home_rejects_pages_that_only_keep_bottom_bar(self):
         spec = kuaishou_spec()
@@ -234,6 +294,39 @@ class AppSpecLayoutTest(unittest.TestCase):
         self.assertEqual(
             "看视频赚金币",
             spec.ad_entry.locators[0].options["contains_text"],
+        )
+
+    def test_fanqie_novel_recognizes_canvas_check_in_and_claims_video_bonus(self):
+        spec = fanqie_novel_spec()
+
+        self.assertIn(
+            "签到奖励加倍OCR",
+            {
+                locator.strategy_id
+                for locator in spec.check_in.success_targets[0].locators
+            },
+        )
+        self.assertEqual("番茄小说签到翻倍视频", spec.check_in.post_ad_target.target_id)
+        self.assertIn(
+            "签到翻倍视频OCR",
+            {locator.strategy_id for locator in spec.check_in.post_ad_target.locators},
+        )
+        self.assertIn(
+            "广告领取成功OCR",
+            {locator.strategy_id for locator in spec.ad.completion_markers[0].locators},
+        )
+        self.assertEqual(50.0, spec.ad.completion_wait_seconds)
+
+    def test_fanqie_novel_drains_canvas_popups_before_check_in(self):
+        plugin = create_fanqie_novel_plugin()
+        check_in_task = plugin.workflow.tasks.check_in.__self__
+        task_page = check_in_task.go_task_page
+
+        self.assertTrue(task_page.check_after_entry)
+        self.assertEqual(5, task_page.max_dismissals)
+        self.assertIn(
+            "番茄小说跳一跳活动弹窗",
+            {popup.marker.target_id for popup in task_page.popups},
         )
 
     def test_kuaishou_task_entry_has_visual_fallback(self):

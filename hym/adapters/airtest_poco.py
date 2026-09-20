@@ -34,6 +34,23 @@ _ACTIVITY_COMPONENT = re.compile(
 _POCO_SERVICE_PACKAGE = "com.netease.open.pocoservice"
 _PIXEL_BOUNDS = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
 _UI_DUMP_PATH = "/sdcard/hym-window.xml"
+_MEDIA_VOLUME_RANGE = re.compile(r"range\s*\[\s*(\d+)\s*\.\.\s*(\d+)\s*\]", re.IGNORECASE)
+_MEDIA_VOLUME_LEVEL = re.compile(r"volume\s+is\s+(\d+)", re.IGNORECASE)
+_MEDIA_PLAYBACK_STATE = re.compile(r"state=PlaybackState\s*\{state=(\d+)")
+
+
+def _read_media_volume(device: Any) -> tuple[int, int, int]:
+    output = str(device.shell("cmd media_session volume --stream 3 --get"))
+    range_match = _MEDIA_VOLUME_RANGE.search(output)
+    level_match = _MEDIA_VOLUME_LEVEL.search(output)
+    if level_match is None:
+        raise RuntimeError("无法读取媒体音量")
+    minimum, maximum = (
+        (0, 15)
+        if range_match is None
+        else (int(range_match.group(1)), int(range_match.group(2)))
+    )
+    return int(level_match.group(1)), minimum, maximum
 
 
 def create_legacy_device_manager(descriptor: DeviceDescriptor):
@@ -71,6 +88,7 @@ class AirtestPocoDeviceAdapter:
         self._manager_factory = manager_factory
         self._manager = manager
         self._last_activity = ActivityInfo()
+        self._screen_off_timeout: str | None = None
 
     @property
     def descriptor(self) -> DeviceDescriptor:
@@ -89,6 +107,7 @@ class AirtestPocoDeviceAdapter:
                     retryable=True,
                     status=ActionStatus.UNAVAILABLE,
                 )
+            self._enable_keep_awake(self._manager)
             return ActionResult.success("connect", started_at=started)
         except Exception as error:
             self._manager = None
@@ -97,6 +116,8 @@ class AirtestPocoDeviceAdapter:
     def disconnect(self) -> ActionResult:
         started = utc_now()
         try:
+            if self._manager is not None:
+                self._restore_screen_timeout(self._manager)
             # Airtest 的 Android.disconnect 会执行 ADB transport 断开，USB 设备也会从
             # adb devices 消失。会话结束只释放本地引用，进程退出会清理 Poco 资源。
             self._manager = None
@@ -104,6 +125,25 @@ class AirtestPocoDeviceAdapter:
         except Exception as error:
             self._manager = None
             return ActionResult.failure("disconnect", str(error), started_at=started, retryable=True)
+
+    def _enable_keep_awake(self, manager: Any) -> None:
+        shell = getattr(manager.dev, "shell", None)
+        if not callable(shell):
+            return
+        previous = str(shell("settings get system screen_off_timeout")).strip()
+        self._screen_off_timeout = previous if previous and previous != "null" else None
+        manager.dev.wake()
+        shell("settings put system screen_off_timeout 2147483647")
+
+    def _restore_screen_timeout(self, manager: Any) -> None:
+        shell = getattr(manager.dev, "shell", None)
+        if not callable(shell):
+            return
+        if self._screen_off_timeout is None:
+            shell("settings delete system screen_off_timeout")
+        else:
+            shell(f"settings put system screen_off_timeout {self._screen_off_timeout}")
+        self._screen_off_timeout = None
 
     def health_check(self) -> HealthReport:
         if self._manager is None or not getattr(self._manager, "device_ready", False):
@@ -169,6 +209,55 @@ class AirtestPocoDeviceAdapter:
         """使用 Airtest 输入法写入文本，支持中文且不暴露给上层流程。"""
 
         return self._run_action("input_text", lambda manager: manager.dev.text(value, enter=False))
+
+    def set_media_volume(self, percent: int) -> ActionResult:
+        percent = _bounded_percent(percent)
+
+        def execute(manager) -> None:
+            _, minimum, maximum = _read_media_volume(manager.dev)
+            level = round(minimum + (maximum - minimum) * percent / 100)
+            manager.dev.shell(f"cmd media_session volume --stream 3 --set {level}")
+            actual, _, _ = _read_media_volume(manager.dev)
+            if actual != level:
+                key = "VOLUME_UP" if level > actual else "VOLUME_DOWN"
+                for _ in range(abs(level - actual)):
+                    manager.dev.keyevent(key)
+                actual, _, _ = _read_media_volume(manager.dev)
+            if actual != level:
+                raise RuntimeError(f"媒体音量设置未生效: 当前 {actual}，目标 {level}")
+
+        return self._run_action("set_media_volume", execute)
+
+    def media_playback_state(self, package_name: str) -> int | None:
+        if self._manager is None:
+            return None
+        output = str(self._manager.dev.shell("dumpsys media_session"))
+        package_marker = f"package={package_name}"
+        marker_index = output.find(package_marker)
+        if marker_index < 0:
+            return None
+        following = output[marker_index : marker_index + 2_000]
+        match = _MEDIA_PLAYBACK_STATE.search(following)
+        return int(match.group(1)) if match is not None else None
+
+    def set_screen_brightness(self, percent: int) -> ActionResult:
+        percent = _bounded_percent(percent)
+        brightness = round(255 * percent / 100)
+
+        def execute(manager) -> None:
+            manager.dev.shell("settings put system screen_brightness_mode 0")
+            manager.dev.shell(f"settings put system screen_brightness {brightness}")
+
+        return self._run_action("set_screen_brightness", execute)
+
+    def unlock(self) -> ActionResult:
+        def execute(manager) -> None:
+            manager.dev.wake()
+            if manager.dev.is_locked():
+                manager.dev.unlock()
+                manager.swipe_up_unlock()
+
+        return self._run_action("unlock", execute)
 
     def observe(self, request: ObservationRequest) -> ObservationResult:
         if self._manager is None:
@@ -443,6 +532,13 @@ def _text(value: Any) -> str | None:
 
 def _optional_bool(value: Any) -> bool | None:
     return value if isinstance(value, bool) else None
+
+
+def _bounded_percent(value: int) -> int:
+    value = int(value)
+    if not 0 <= value <= 100:
+        raise ValueError("设备设置百分比必须位于 0 到 100 之间")
+    return value
 
 
 def _first_bool(*values: Any) -> bool | None:

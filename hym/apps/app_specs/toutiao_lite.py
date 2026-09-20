@@ -42,6 +42,7 @@ from hym.apps.targets import (
     text_locator,
 )
 from hym.core.control import TaskScope
+from hym.core.events import EventLevel
 from hym.core.models import AppIdentity, Point, Rect, SystemKey, UiTreeSource
 from hym.core.pages import ObservationProfile, PageSpec
 from hym.runtime.context import AppContext
@@ -278,7 +279,17 @@ class ToutiaoNovelBonusTask:
         if context.random.random() >= probability:
             return StepOutcome.skipped("本轮随机跳过小说奖励")
         if not self.go_task_page(context):
-            return StepOutcome.failure("小说奖励前无法进入任务页")
+            message = "小说奖励前无法进入任务页"
+            context.emit(
+                "reward.optional.unavailable",
+                "奖励任务暂不可用",
+                message,
+                level=EventLevel.WARNING,
+                workflow_id="daily",
+                step_id="小说奖励",
+                status="skipped",
+            )
+            return StepOutcome.skipped(message)
         entry = target(
             "头条极速版小说奖励入口",
             text_locator("看小说赚金币文本", "看小说赚金币", contains=True),

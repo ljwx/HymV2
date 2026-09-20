@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
-from hym.apps.catalog import douyin_spec, kuaishou_spec, qutoutiao_spec, ximalaya_spec
+from hym.apps.catalog import douyin_spec, fanqie_audio_spec, kuaishou_spec, qutoutiao_spec, ximalaya_spec
 from hym.apps.plugin import create_daily_plugin
 from hym.core.config import AppRunSettings, BehaviorSettings
 from hym.core.events import InMemoryEventSink
@@ -346,13 +346,16 @@ class ExtensibilityTest(unittest.TestCase):
 
         self.assertEqual("success", outcome.status.value)
         self.assertEqual(["audio"], called)
+        self.assertEqual(2, content_step.max_attempts)
+        self.assertIsNotNone(content_step.recovery)
 
     def test_real_observations_are_reflected_in_app_specs(self):
         douyin = douyin_spec()
         qutoutiao = qutoutiao_spec()
+        fanqie_audio = fanqie_audio_spec()
         ximalaya = ximalaya_spec()
 
-        self.assertEqual(2, douyin.navigation.home_page.minimum_markers)
+        self.assertEqual(1, douyin.navigation.home_page.minimum_markers)
         self.assertEqual(
             (douyin.navigation.home_tab, douyin.content.feed_marker),
             douyin.navigation.home_page.markers,
@@ -366,6 +369,20 @@ class ExtensibilityTest(unittest.TestCase):
         self.assertIn(
             douyin.navigation.task_marker,
             douyin.navigation.home_page.forbidden_markers,
+        )
+        self.assertEqual(1, qutoutiao.navigation.home_page.minimum_markers)
+        self.assertIn(
+            qutoutiao.navigation.task_marker,
+            qutoutiao.navigation.home_page.forbidden_markers,
+        )
+        self.assertEqual(2, fanqie_audio.navigation.home_page.minimum_markers)
+        self.assertEqual(
+            "番茄畅听首页频道已选中",
+            fanqie_audio.navigation.home_page.markers[0].target_id,
+        )
+        self.assertIn(
+            fanqie_audio.navigation.task_marker,
+            fanqie_audio.navigation.home_page.forbidden_markers,
         )
         task_ocr = next(
             locator

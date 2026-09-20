@@ -96,7 +96,13 @@ class AudioContentTask:
             elapsed += wait_seconds
             # 长时任务只检查前台包名，不在正常路径持续解析 UI。
             current = context.actions.observe(include_ui_tree=False, include_screenshot=False)
-            if current is not None and current.activity.package_name == self.app.package_name:
+            playback_state = context.session.media_playback_state(self.app.package_name)
+            playback_active = playback_state is None or playback_state in {3, 4, 5, 6, 8}
+            if (
+                current is not None
+                and current.activity.package_name == self.app.package_name
+                and playback_active
+            ):
                 progress["elapsed_seconds"] = elapsed
                 context.reach_safe_point(
                     "content.audio.checkpoint",

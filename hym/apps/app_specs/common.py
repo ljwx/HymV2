@@ -85,8 +85,11 @@ class TaskPagePopupNavigator:
                 break
             self.navigation.emit_popup_dismissed(context, target_id)
             context.timing.operation_delay()
-            if context.actions.match_page(task_page).matched:
-                return True
+            # Popup contents and the task page behind its translucent mask can
+            # both be visible to OCR. Keep draining known popup layers before
+            # accepting the underlying page marker.
+        if context.actions.match_page(task_page).matched:
+            return True
         if reached:
             return True
         return self.navigation.go_task_page(context)

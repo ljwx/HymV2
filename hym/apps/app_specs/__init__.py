@@ -4,10 +4,12 @@ from hym.apps.app_specs.baidu_lite import baidu_lite_spec
 from hym.apps.app_specs.douyin import douyin_spec
 from hym.apps.app_specs.fanqie_audio import fanqie_audio_spec
 from hym.apps.app_specs.fanqie_novel import fanqie_novel_spec
+from hym.apps.app_specs.hema_theater import hema_theater_spec
 from hym.apps.app_specs.kuaishou import kuaishou_spec
 from hym.apps.app_specs.qutoutiao import qutoutiao_spec
 from hym.apps.app_specs.toutiao_lite import toutiao_lite_spec
 from hym.apps.app_specs.wukong_browser import wukong_browser_spec
+from hym.apps.app_specs.xifan_theater import xifan_theater_spec
 from hym.apps.app_specs.ximalaya import ximalaya_spec
 
 __all__ = (
@@ -20,4 +22,6 @@ __all__ = (
     "fanqie_audio_spec",
     "baidu_lite_spec",
     "wukong_browser_spec",
+    "hema_theater_spec",
+    "xifan_theater_spec",
 )

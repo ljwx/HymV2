@@ -43,7 +43,7 @@ PyCharm 可直接运行根目录 `main.py`，流程日志会实时显示在 Run 
 - `timing_scale`：普通等待总倍率，`0.6` 会把基准 5 秒缩短到约 3 秒。
 - `jitter_ratio`：没有独立范围的固定等待所使用的随机浮动比例；设为 `0` 时只做固定倍率缩放。
 - `operation_delay_min/center/max/stddev`：点击、返回、切页后的短等待分布。
-- `app_rest_seconds_min/center/max/stddev`：一个 App 完整结束后、下一个 App 启动前的桌面休息分布；当前为 2～5 分钟、中心值 3.5 分钟。
+- `app_rest_seconds_min/center/max/stddev`：一个 App 完整结束后、下一个 App 启动前的桌面休息分布；当前为 4～8 分钟、中心值 6 分钟。
 - `reward_wait_scale`：广告奖励等待的独立倍率，避免普通调速导致奖励计时不足。
 - `touch_offset_ratio`：在目标内部加入很小的点击位置浮动。
 - `health_check_interval_seconds`：默认 `0`，表示不额外轮询设备；操作失败时才触发重连。无线调试不稳定时可以改为较大的正数。
@@ -71,6 +71,7 @@ App 间休息与随机插空相互独立。只有一个 App 的工作流完整�
 - `first_check_in_probability`：签到放在内容浏览前的概率，其余情况放在内容浏览后。
 - `content_count_min/center/max/stddev`：每轮浏览内容数量分布。
 - `normal_duration_min/center/max/stddev`、`long_duration_min/center/max/stddev`：普通和长视频浏览时长分布。
+- `auto_advance_probability`：短剧播放器自动续播时，不额外上滑并继续停留观察的概率。
 - `uninterested_video_probability`：普通视频低概率快速划过的比例，当前默认 `0.08`。
 - `full_watch_attempt_probability`：普通视频进入较长完整观看尝试的比例，当前默认 `0.25`。
 - `uninterested_duration_*`、`full_watch_fallback_duration_*`：快速划过和完整观看尝试各自的时长分布。
@@ -163,7 +164,7 @@ rg 'workflow.finished|workflow.suspended|runtime.interruption|diagnostic.thresho
     "upload_artifacts": true,
     "control_enabled": true,
     "control_timeout_seconds": 1.0,
-    "control_poll_interval_seconds": 5.0
+    "control_poll_interval_seconds": 10.0
   }
 }
 ```

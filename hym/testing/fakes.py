@@ -44,6 +44,7 @@ class FakeDevice:
         self.operations: list[RecordedOperation] = []
         self._observations: Deque[ObservationResult] = deque(observations)
         self._scripted_results: dict[str, Deque[ActionResult]] = defaultdict(deque)
+        self.media_states: dict[str, Deque[int | None]] = defaultdict(deque)
         self._connected = False
 
     @property
@@ -105,6 +106,20 @@ class FakeDevice:
 
     def input_text(self, value: str) -> ActionResult:
         return self._action("input_text", text_length=len(value))
+
+    def set_media_volume(self, percent: int) -> ActionResult:
+        return self._action("set_media_volume", percent=percent)
+
+    def media_playback_state(self, package_name: str) -> int | None:
+        self.operations.append(RecordedOperation("media_playback_state", {"package_name": package_name}))
+        states = self.media_states[package_name]
+        return states.popleft() if states else None
+
+    def set_screen_brightness(self, percent: int) -> ActionResult:
+        return self._action("set_screen_brightness", percent=percent)
+
+    def unlock(self) -> ActionResult:
+        return self._action("unlock")
 
 
 class FakeDeviceFactory:

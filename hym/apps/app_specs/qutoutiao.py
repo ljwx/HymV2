@@ -184,7 +184,8 @@ def qutoutiao_spec() -> AppSpec:
                 (home_tab, news_list_marker),
                 forbidden_markers=(task_marker, sign_overlay),
                 activity_patterns=(r"MainActivity$",),
-                minimum_markers=2,
+                # 新版信息流不再暴露 recycler_view，底栏选中态是稳定的首页信号。
+                minimum_markers=1,
                 observation_profile=observation_profile,
             ),
             task_page=PageSpec(

@@ -243,7 +243,8 @@ def douyin_spec() -> AppSpec:
                 (home_tab, feed_marker),
                 forbidden_markers=(task_marker,),
                 activity_patterns=(r"SplashActivity$",),
-                minimum_markers=2,
+                # 视频流节点在播放时会频繁重建，底栏选中态才是稳定的首页信号。
+                minimum_markers=1,
                 observation_profile=observation_profile,
             ),
             task_page=PageSpec(

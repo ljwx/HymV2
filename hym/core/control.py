@@ -15,6 +15,11 @@ class TaskScope(str, Enum):
     SETUP = "setup"
     CLEANUP = "cleanup"
     FULL_ONLY = "full_only"
+    DEVICE_VOLUME = "device_volume"
+    SCREEN_BRIGHTNESS = "screen_brightness"
+    DEVICE_HOME = "device_home"
+    DEVICE_LOCK = "device_lock"
+    DEVICE_UNLOCK = "device_unlock"
 
     @property
     def display_name(self) -> str:
@@ -27,6 +32,11 @@ class TaskScope(str, Enum):
             TaskScope.SETUP: "准备步骤",
             TaskScope.CLEANUP: "收尾步骤",
             TaskScope.FULL_ONLY: "完整流程专用步骤",
+            TaskScope.DEVICE_VOLUME: "媒体音量",
+            TaskScope.SCREEN_BRIGHTNESS: "屏幕亮度",
+            TaskScope.DEVICE_HOME: "返回桌面",
+            TaskScope.DEVICE_LOCK: "锁屏",
+            TaskScope.DEVICE_UNLOCK: "解锁手机",
         }[self]
 
 
@@ -37,6 +47,10 @@ class DeviceControlState:
     requested_at_ms: int | None = None
     pause_until_ms: int | None = None
     acknowledged_at_ms: int | None = None
+    desired_state: str = "running"
+    state_requested_at_ms: int | None = None
+    observed_state: str = "offline"
+    observed_at_ms: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,3 +60,4 @@ class RemoteCommand:
     app_id: str | None
     scope: TaskScope
     rounds: int
+    value: int | None = None

@@ -25,6 +25,19 @@ TaskPageNavigator = Callable[[AppContext], bool]
 HomeRecovery = Callable[[AppContext], None]
 
 
+def _optional_reward_unavailable(context: AppContext, step_id: str, message: str) -> StepOutcome:
+    context.emit(
+        "reward.optional.unavailable",
+        "奖励任务暂不可用",
+        message,
+        level=EventLevel.WARNING,
+        workflow_id="daily",
+        step_id=step_id,
+        status="skipped",
+    )
+    return StepOutcome.skipped(message)
+
+
 @dataclass(frozen=True, slots=True)
 class CheckInTask:
     """执行可复用的多阶段签到；特殊签到可由 App 换成自己的任务。"""
@@ -46,7 +59,7 @@ class CheckInTask:
         if spec is None:
             return StepOutcome.skipped("当前应用没有签到流程")
         if not self.go_task_page(context):
-            return StepOutcome.failure("无法进入任务页")
+            return _optional_reward_unavailable(context, "每日签到", "签到时无法进入任务页")
 
         if self.app_spec.ad is not None:
             for _ in range(spec.pre_ad_attempts):
@@ -57,7 +70,11 @@ class CheckInTask:
                     break
                 AdStateMachine().run(context, self.app_spec.ad)
             if spec.pre_ad_attempts and not self.go_task_page(context):
-                return StepOutcome.failure("签到前置广告结束后无法恢复任务页")
+                return _optional_reward_unavailable(
+                    context,
+                    "每日签到",
+                    "签到前置广告结束后无法恢复任务页",
+                )
         return self._run_states(context, spec, checkpoint)
 
     def _run_states(
@@ -146,7 +163,11 @@ class CheckInTask:
                 reason="状态流结束后未见成功信号",
             )
             return StepOutcome.failure("签到动作已执行，但没有识别到完成状态")
-        return StepOutcome.failure("当前页面没有匹配到可执行的签到分支")
+        return _optional_reward_unavailable(
+            context,
+            "每日签到",
+            "当前页面没有可领取或已完成的签到状态",
+        )
 
     def _match_state(
         self,
@@ -226,10 +247,10 @@ class BalanceTask:
         if spec is None:
             return StepOutcome.skipped("当前应用没有余额流程")
         if not self.go_task_page(context):
-            return StepOutcome.failure("记录余额时无法进入任务页")
+            return _optional_reward_unavailable(context, "记录余额", "记录余额时无法进入任务页")
         if spec.enter_target is not None:
             if not context.actions.tap_target(spec.enter_target, timeout=2.0):
-                return StepOutcome.failure("没有找到余额页面入口")
+                return _optional_reward_unavailable(context, "记录余额", "没有找到余额页面入口")
             if spec.enter_wait_seconds is None:
                 context.timing.operation_delay()
             else:
@@ -238,7 +259,11 @@ class BalanceTask:
             spec.page_marker,
             timeout=3.0,
         ):
-            return StepOutcome.failure("进入余额页面后没有找到页面标记")
+            return _optional_reward_unavailable(
+                context,
+                "记录余额",
+                "进入余额页面后没有找到页面标记",
+            )
 
         if spec.assets:
             return self._record_assets(context, spec.assets, spec.close_with_back)
@@ -246,7 +271,7 @@ class BalanceTask:
         assert spec.balance_target is not None
         result = context.actions.resolve(spec.balance_target, timeout=3.0)
         if not result.found or result.target is None:
-            return StepOutcome.failure("没有识别到余额区域")
+            return _optional_reward_unavailable(context, "记录余额", "没有识别到余额区域")
         artifacts = ()
         value = result.target.evidence or ""
         if spec.screenshot_only or re.search(r"\d", value) is None:
@@ -286,7 +311,7 @@ class BalanceTask:
             include_screenshot=True,
         )
         if observation is None or observation.screenshot is None:
-            return StepOutcome.failure("余额页面截图失败")
+            return _optional_reward_unavailable(context, "记录余额", "余额页面截图失败")
 
         values: list[dict[str, object]] = []
         missing: list[str] = []
@@ -307,7 +332,11 @@ class BalanceTask:
                 }
             )
         if missing:
-            return StepOutcome.failure(f"没有识别到余额字段: {'、'.join(missing)}")
+            return _optional_reward_unavailable(
+                context,
+                "记录余额",
+                f"没有识别到余额字段: {'、'.join(missing)}",
+            )
 
         data = {
             "business_date": context.business_date.isoformat(),
@@ -375,15 +404,15 @@ class WithdrawalTask:
         if self._is_fresh(context, spec):
             return StepOutcome(WorkflowStatus.ALREADY_DONE, "提现信息仍在刷新周期内")
         if context.ocr is None:
-            return StepOutcome.failure("提现信息需要 OCR，但当前没有可用 OCR 引擎")
+            return self._unavailable(context, "提现信息需要 OCR，但当前没有可用 OCR 引擎")
         if not self.go_task_page(context):
-            return StepOutcome.failure("更新提现信息时无法进入任务页")
+            return self._unavailable(context, "更新提现信息时无法进入任务页")
 
         opened = 0
         for entry in spec.entry_sequence:
             if not context.actions.tap_target(entry, timeout=2.0):
                 self._close(context, opened)
-                return StepOutcome.failure(f"没有找到提现页面入口: {entry.target_id}")
+                return self._unavailable(context, f"没有找到提现页面入口: {entry.target_id}")
             opened += 1
             context.timing.wait(
                 context.sample_seconds(
@@ -402,12 +431,12 @@ class WithdrawalTask:
         observation = context.actions.observe(include_ui_tree=False, include_screenshot=True)
         if observation is None or observation.screenshot is None:
             self._close(context, spec.close_back_count)
-            return StepOutcome.failure("提现页面截图失败")
+            return self._unavailable(context, "提现页面截图失败")
         try:
             texts = context.ocr.recognize(observation.screenshot)
         except Exception as error:
             self._close(context, spec.close_back_count)
-            return StepOutcome.failure(f"提现页面 OCR 失败: {error}")
+            return self._unavailable(context, f"提现页面 OCR 失败: {error}")
 
         available = _first_amount_in_region(texts, spec.available_region, spec.scale)
         minimum = spec.minimum_amount_minor
@@ -417,7 +446,7 @@ class WithdrawalTask:
                 minimum = detected
         if available is None:
             self._close(context, spec.close_back_count)
-            return StepOutcome.failure("没有识别到可提现余额")
+            return self._unavailable(context, "没有识别到可提现余额")
 
         eligible = minimum is not None and available >= minimum
         data = {
@@ -447,6 +476,19 @@ class WithdrawalTask:
         )
         self._close(context, spec.close_back_count)
         return StepOutcome.success("提现信息更新完成", **data)
+
+    @staticmethod
+    def _unavailable(context: AppContext, message: str) -> StepOutcome:
+        context.emit(
+            "reward.withdrawal.unavailable",
+            "提现信息暂不可用",
+            message,
+            level=EventLevel.WARNING,
+            workflow_id="daily",
+            step_id="更新提现信息",
+            status="skipped",
+        )
+        return StepOutcome.skipped(message)
 
     @staticmethod
     def _is_fresh(context: AppContext, spec: WithdrawalSpec) -> bool:
@@ -506,7 +548,11 @@ class DurationRewardTask:
         if spec is None:
             return StepOutcome.skipped("当前应用没有时段奖励")
         if not self.go_task_page(context):
-            return StepOutcome.failure("领取时段奖励时无法进入任务页")
+            return _optional_reward_unavailable(
+                context,
+                "领取时段奖励",
+                "领取时段奖励时无法进入任务页",
+            )
         if not context.actions.tap_target(spec.reward_target, timeout=2.0):
             return StepOutcome.skipped("当前没有可领取的时段奖励")
         if spec.result_wait_seconds is None:
@@ -536,13 +582,19 @@ class DurationRewardTask:
         if spec.close_target is not None:
             context.actions.tap_target(spec.close_target, timeout=1.0)
         if ad_outcome is not None and ad_outcome.status is not WorkflowStatus.SUCCESS:
-            return StepOutcome(
-                WorkflowStatus.PARTIAL,
-                "时段奖励已领取，但附加广告未完整结束",
-                {
-                    "ad_status": ad_outcome.status.value,
-                    "ad_message": ad_outcome.message,
-                },
+            context.emit(
+                "reward.duration.extra_ad.unavailable",
+                "附加广告暂不可用",
+                ad_outcome.message,
+                level=EventLevel.WARNING,
+                workflow_id="daily",
+                step_id="领取时段奖励",
+                status="skipped",
+            )
+            return StepOutcome.success(
+                "时段奖励已领取，附加广告未完整结束",
+                ad_status=ad_outcome.status.value,
+                ad_message=ad_outcome.message,
             )
         return StepOutcome.success("时段奖励领取完成")
 
@@ -613,21 +665,25 @@ class AdRewardTask:
                 status=outcome.status.value,
                 data={"index": index, "total": total, "result": outcome.status.value},
             )
+        return self._summarize(completed, uncertain, failed, total)
+
+    @staticmethod
+    def _summarize(completed: int, uncertain: int, failed: int, total: int) -> StepOutcome:
         outputs = {
             "completed": completed,
             "uncertain": uncertain,
             "failed": failed,
             "total": total,
         }
-        if completed == 0 and uncertain == 0:
-            return StepOutcome.failure("广告任务没有完成，但不会阻断后续流程")
-        if completed < total:
+        if completed > 0:
+            return StepOutcome.success("可用广告奖励领取完成", **outputs)
+        if uncertain > 0:
             return StepOutcome(
                 WorkflowStatus.PARTIAL,
-                "广告任务仅部分确认完成",
+                "广告任务结果未能完全确认",
                 outputs,
             )
-        return StepOutcome.success("广告任务完成", **outputs)
+        return StepOutcome(WorkflowStatus.SKIPPED, "当前没有可领取的广告奖励", outputs)
 
     @staticmethod
     def _emit_finished(

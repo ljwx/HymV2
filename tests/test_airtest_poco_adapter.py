@@ -23,10 +23,14 @@ class StubImage:
 class StubDev:
     def __init__(self):
         self.calls = []
+        self.current_volume = 4
+        self.apply_direct_volume_set = True
+        self.screen_off_timeout = "30000"
         self.activity_output = (
             "topResumedActivity=ActivityRecord{123456 u0 "
             "com.example/com.example.RealActivity t123}"
         )
+        self.media_session_output = ""
 
     def touch(self, position, duration):
         self.calls.append(("touch", position, duration))
@@ -36,6 +40,10 @@ class StubDev:
 
     def keyevent(self, key):
         self.calls.append(("keyevent", key))
+        if key == "VOLUME_UP":
+            self.current_volume = min(15, self.current_volume + 1)
+        elif key == "VOLUME_DOWN":
+            self.current_volume = max(0, self.current_volume - 1)
 
     def text(self, value, enter=False):
         self.calls.append(("text", value, enter))
@@ -44,8 +52,27 @@ class StubDev:
         self.calls.append(("snapshot", max_size))
         return StubImage()
 
+    def wake(self):
+        self.calls.append(("wake",))
+
     def shell(self, command):
         self.calls.append(("shell", command))
+        if command == "cmd media_session volume --stream 3 --get":
+            return f"volume is {self.current_volume} in range [0..15]"
+        if command == "dumpsys media_session":
+            return self.media_session_output
+        if command.startswith("cmd media_session volume --stream 3 --set "):
+            if self.apply_direct_volume_set:
+                self.current_volume = int(command.rsplit(" ", 1)[-1])
+            return ""
+        if command == "settings get system screen_off_timeout":
+            return self.screen_off_timeout
+        if command.startswith("settings put system screen_off_timeout "):
+            self.screen_off_timeout = command.rsplit(" ", 1)[-1]
+            return ""
+        if command == "settings delete system screen_off_timeout":
+            self.screen_off_timeout = "null"
+            return ""
         if command.startswith("uiautomator dump"):
             return """<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <hierarchy rotation="0"><node text="任务中心" resource-id="com.example:id/task"
@@ -131,6 +158,17 @@ class AirtestPocoDeviceAdapterTest(unittest.TestCase):
         self.assertTrue(result.succeeded)
         self.assertEqual(["com.example"], self.manager.stopped)
 
+    def test_reads_package_media_playback_state(self):
+        self.manager.dev.media_session_output = """
+          package=com.other
+          state=PlaybackState {state=2, position=10}
+          package=com.example
+          state=PlaybackState {state=3, position=20}
+        """
+
+        self.assertEqual(3, self.adapter.media_playback_state("com.example"))
+        self.assertIsNone(self.adapter.media_playback_state("com.missing"))
+
     def test_observation_contains_neutral_ui_nodes_and_frame(self):
         result = self.adapter.observe(ObservationRequest(include_ui_tree=True, include_screenshot=True))
 
@@ -190,11 +228,46 @@ class AirtestPocoDeviceAdapterTest(unittest.TestCase):
         self.assertTrue(result.succeeded)
         self.assertEqual(("text", "最近怎么样", False), self.manager.dev.calls[-1])
 
+    def test_sets_media_volume_using_device_range(self):
+        result = self.adapter.set_media_volume(60)
+
+        self.assertTrue(result.succeeded)
+        self.assertIn(("shell", "cmd media_session volume --stream 3 --set 9"), self.manager.dev.calls)
+        self.assertNotIn(("keyevent", "VOLUME_UP"), self.manager.dev.calls)
+
+    def test_falls_back_to_volume_keys_when_direct_set_is_ignored(self):
+        self.manager.dev.apply_direct_volume_set = False
+
+        result = self.adapter.set_media_volume(60)
+
+        self.assertTrue(result.succeeded)
+        self.assertEqual(9, self.manager.dev.current_volume)
+        self.assertEqual(5, self.manager.dev.calls.count(("keyevent", "VOLUME_UP")))
+
+    def test_sets_screen_brightness_as_percent(self):
+        result = self.adapter.set_screen_brightness(40)
+
+        self.assertTrue(result.succeeded)
+        self.assertIn(("shell", "settings put system screen_brightness_mode 0"), self.manager.dev.calls)
+        self.assertIn(("shell", "settings put system screen_brightness 102"), self.manager.dev.calls)
+
     def test_disconnect_keeps_adb_transport_connected(self):
         result = self.adapter.disconnect()
 
         self.assertTrue(result.succeeded)
         self.assertNotIn(("disconnect",), self.manager.dev.calls)
+
+    def test_connect_keeps_screen_awake_and_disconnect_restores_timeout(self):
+        connected = self.adapter.connect()
+
+        self.assertTrue(connected.succeeded)
+        self.assertEqual("2147483647", self.manager.dev.screen_off_timeout)
+        self.assertIn(("wake",), self.manager.dev.calls)
+
+        disconnected = self.adapter.disconnect()
+
+        self.assertTrue(disconnected.succeeded)
+        self.assertEqual("30000", self.manager.dev.screen_off_timeout)
 
     def test_system_tree_can_be_selected_per_observation(self):
         result = self.adapter.observe(

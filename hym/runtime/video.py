@@ -236,9 +236,22 @@ class VideoContentTask:
         normal_count = int(progress.get("normal", 0))
         unrecognized_streak = int(progress.get("unrecognized_streak", 0))
         recover_after = int(context.option("recover_after_unrecognized_items", 2))
-        for index in range(int(progress.get("next_index", 1)), count + 1):
+        next_index = int(progress.get("next_index", 1))
+        auto_advance_probability = max(
+            0.0,
+            min(1.0, float(context.option("auto_advance_probability", 0.0))),
+        )
+        for index in range(next_index, count + 1):
             item_started = context.timing.clock.now()
-            context.actions.swipe_up()
+            # 部分短剧会在当前剧集结束后自动续播。首段仍主动翻页，后续按应用配置
+            # 留在播放器等待续播；若尚未播完，相当于延长当前剧集观看时间。
+            wait_for_auto_advance = (
+                index > next_index
+                and auto_advance_probability > 0
+                and context.random.random() < auto_advance_probability
+            )
+            if not wait_for_auto_advance:
+                context.actions.swipe_up()
             context.timing.clock.sleep(
                 context.sample_seconds("content_classify_delay", 0.25, 0.6)
             )

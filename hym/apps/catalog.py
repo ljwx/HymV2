@@ -5,10 +5,12 @@ from hym.apps.app_specs import (
     douyin_spec,
     fanqie_audio_spec,
     fanqie_novel_spec,
+    hema_theater_spec,
     kuaishou_spec,
     qutoutiao_spec,
     toutiao_lite_spec,
     wukong_browser_spec,
+    xifan_theater_spec,
     ximalaya_spec,
 )
 
@@ -22,4 +24,6 @@ __all__ = (
     "fanqie_audio_spec",
     "baidu_lite_spec",
     "wukong_browser_spec",
+    "hema_theater_spec",
+    "xifan_theater_spec",
 )

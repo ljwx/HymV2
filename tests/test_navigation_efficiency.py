@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from hym.apps.app_specs.baidu_lite import baidu_lite_spec
+from hym.apps.app_specs.fanqie_audio import FanqieAudioPlayback, fanqie_audio_spec
 from hym.apps.app_specs.qutoutiao import QutoutiaoTaskPageNavigator
 from hym.apps.app_specs.ximalaya import XimalayaPlayback
 from hym.apps.catalog import douyin_spec, kuaishou_spec, qutoutiao_spec, ximalaya_spec
@@ -173,6 +174,7 @@ class StubRandom:
 def _context(actions):
     session = SimpleNamespace(starts=[])
     session.start_app = lambda app: session.starts.append(app.package_name)
+    session.media_playback_state = lambda package_name: None
     runtime_progress = {}
     events = []
     context = SimpleNamespace(
@@ -263,7 +265,7 @@ class NavigationEfficiencyTest(unittest.TestCase):
         self.assertEqual([], actions.tapped)
         self.assertEqual([], actions.pressed)
 
-    def test_douyin_still_selects_home_tab_when_video_feed_is_missing(self):
+    def test_douyin_accepts_selected_home_tab_when_dynamic_video_feed_is_missing(self):
         spec = douyin_spec()
         actions = StubActions(
             [
@@ -279,8 +281,8 @@ class NavigationEfficiencyTest(unittest.TestCase):
 
         self.assertTrue(NavigationController(spec).go_home(_context(actions), select_tab=True))
 
-        self.assertEqual(2, actions.observation_count)
-        self.assertEqual([spec.navigation.home_tab.target_id], actions.tapped)
+        self.assertEqual(1, actions.observation_count)
+        self.assertEqual([], actions.tapped)
         self.assertEqual([], actions.pressed)
 
     def test_bottom_bar_without_home_tab_is_recovered_with_back(self):
@@ -442,6 +444,73 @@ class NavigationEfficiencyTest(unittest.TestCase):
         self.assertEqual(2, actions.observation_count)
         self.assertEqual([audio.resume_target.target_id], actions.tapped)
         self.assertEqual(2, context.timing.operation_delays)
+
+    def test_fanqie_audio_task_page_playbar_does_not_count_as_home(self):
+        spec = fanqie_audio_spec()
+        home_selected, home_marker = spec.navigation.home_page.markers
+        actions = StubActions(
+            [
+                {
+                    home_marker.target_id,
+                    spec.navigation.home_tab.target_id,
+                    spec.navigation.task_marker.target_id,
+                },
+                {
+                    home_selected.target_id,
+                    home_marker.target_id,
+                    spec.navigation.home_tab.target_id,
+                },
+            ],
+            packages=[spec.identity.package_name, spec.identity.package_name],
+        )
+        context = _context(actions)
+
+        self.assertTrue(NavigationController(spec).go_home(context, select_tab=True))
+
+        self.assertEqual([spec.navigation.home_tab.target_id], actions.tapped)
+        self.assertEqual(2, actions.observation_count)
+
+    def test_fanqie_audio_accepts_confirmed_playing_state(self):
+        spec = fanqie_audio_spec()
+        audio = spec.content
+        actions = StubActions(
+            [{audio.session_marker.target_id, audio.playing_target.target_id}],
+            packages=[spec.identity.package_name],
+        )
+        context = _context(actions)
+
+        self.assertTrue(FanqieAudioPlayback().ensure_playing(context, audio))
+
+        self.assertEqual([], actions.tapped)
+        self.assertEqual(1, actions.observation_count)
+
+    def test_fanqie_audio_accepts_system_playing_state_without_ui(self):
+        spec = fanqie_audio_spec()
+        audio = spec.content
+        actions = StubActions([])
+        context = _context(actions)
+        context.session.media_playback_state = lambda package_name: 3
+
+        self.assertTrue(FanqieAudioPlayback().ensure_playing(context, audio))
+
+        self.assertEqual([], actions.tapped)
+        self.assertEqual(0, actions.observation_count)
+
+    def test_fanqie_audio_resumes_paused_session_once(self):
+        spec = fanqie_audio_spec()
+        audio = spec.content
+        actions = StubActions(
+            [{audio.resume_target.target_id}],
+            packages=[spec.identity.package_name],
+        )
+        context = _context(actions)
+        states = iter((2, 3))
+        context.session.media_playback_state = lambda package_name: next(states)
+
+        self.assertTrue(FanqieAudioPlayback().ensure_playing(context, audio))
+
+        self.assertEqual([audio.resume_target.target_id], actions.tapped)
+        self.assertEqual(1, actions.observation_count)
 
     def test_qutoutiao_retries_task_navigation_after_handling_ad(self):
         spec = qutoutiao_spec()

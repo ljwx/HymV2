@@ -37,10 +37,17 @@ class HttpRemoteControlClient:
             requested_at_ms=_optional_int(payload.get("requestedAtMs")),
             pause_until_ms=_optional_int(payload.get("pauseUntilMs")),
             acknowledged_at_ms=_optional_int(payload.get("acknowledgedAtMs")),
+            desired_state=str(payload.get("desiredState", "running")),
+            state_requested_at_ms=_optional_int(payload.get("stateRequestedAtMs")),
+            observed_state=str(payload.get("observedState", "offline")),
+            observed_at_ms=_optional_int(payload.get("observedAtMs")),
         )
 
     def acknowledge_pause(self, device_id: str) -> None:
         self._json_request("POST", f"/control/{_segment(device_id)}/ack", {})
+
+    def report_state(self, device_id: str, state: str) -> None:
+        self._json_request("POST", f"/control/{_segment(device_id)}/state", {"state": state})
 
     def claim_command(self, device_id: str) -> RemoteCommand | None:
         status, payload = self._request("POST", f"/commands/{_segment(device_id)}/claim", {})
@@ -53,6 +60,7 @@ class HttpRemoteControlClient:
             app_id=data.get("appId"),
             scope=TaskScope(str(data["scope"])),
             rounds=int(data["rounds"]),
+            value=_optional_int(data.get("value")),
         )
 
     def complete_command(

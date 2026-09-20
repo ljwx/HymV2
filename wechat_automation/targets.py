@@ -70,13 +70,8 @@ SEARCH_RESULTS = Rect(0.0, 0.15, 1.0, 0.92)
 
 HOME_MARKER = _target(
     "微信首页底栏",
-    LocatorSpec(
-        "首页Activity",
-        LocatorKind.ACTIVITY,
-        r"LauncherUI$",
-        priority=10,
-        options={"mode": "regex", "package_name": WECHAT_PACKAGE},
-    ),
+    _text_locator("微信底栏文字", "微信", priority=10, region=BOTTOM),
+    _ocr_locator("微信底栏OCR", "微信", region=Rect(0.0, 0.88, 0.25, 1.0), priority=20),
     required=False,
 )
 HOME_PAGE = PageSpec(
@@ -86,8 +81,18 @@ HOME_PAGE = PageSpec(
     activity_patterns=(r"LauncherUI$",),
 )
 CHAT_TAB = _target("微信聊天标签", _text_locator("文字", "微信", priority=10, region=BOTTOM))
-DISCOVER_TAB = _target("微信发现标签", _coordinate_locator("已校准底栏位置", 0.625, 0.935))
-ME_TAB = _target("微信我的标签", _coordinate_locator("已校准底栏位置", 0.875, 0.935))
+DISCOVER_TAB = _target(
+    "微信发现标签",
+    _text_locator("发现底栏文字", "发现", priority=10, region=BOTTOM),
+    _ocr_locator("发现底栏OCR", "发现", region=Rect(0.48, 0.88, 0.76, 1.0), priority=20),
+    _coordinate_locator("已校准底栏位置", 0.625, 0.935),
+)
+ME_TAB = _target(
+    "微信我的标签",
+    _text_locator("我的底栏文字", "我", priority=10, region=BOTTOM),
+    _ocr_locator("我的底栏OCR", "我", region=Rect(0.74, 0.88, 1.0, 1.0), priority=20),
+    _coordinate_locator("已校准底栏位置", 0.875, 0.935),
+)
 
 MOMENTS_ENTRY = _target(
     "朋友圈入口",

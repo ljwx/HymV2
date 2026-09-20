@@ -119,16 +119,35 @@ def baidu_lite_spec() -> AppSpec:
         "百度极速版广告关闭",
         desc_locator("广告关闭描述", "关闭"),
         text_locator("广告关闭文本", "关闭", priority=21),
-        coordinate_locator("广告右上角关闭坐标", Point(0.94, 0.06)),
+        coordinate_locator("广告右上角关闭坐标", Point(0.93, 0.085)),
     )
     ad = AdSpec(
         start_markers=(
+            target(
+                "百度极速版新版激励广告页",
+                activity_locator(
+                    "新版激励广告Activity",
+                    r"NadRewardVideoActivityV2$",
+                    package_name=package_name,
+                ),
+            ),
             text_target("百度极速版广告倒计时", "秒后可领奖励", contains=True),
+            target(
+                "百度极速版金币广告倒计时",
+                ocr_locator(
+                    "金币广告倒计时OCR",
+                    r"\d+s后可领\d+金币",
+                    mode="regex",
+                    region=Rect(0.0, 0.03, 0.48, 0.16),
+                    confidence=0.45,
+                ),
+            ),
             text_target("百度极速版激励广告", "广告", contains=True),
         ),
         completion_markers=(
             text_target("百度极速版广告到账", "领取成功", contains=True),
             text_target("百度极速版广告奖励获得", "已获得", contains=True),
+            text_target("百度极速版广告金币已领取", "已领取", contains=True),
             text_target("百度极速版广告体验提示", "打开应用并体验", contains=True),
         ),
         continue_targets=(),
@@ -176,13 +195,30 @@ def baidu_lite_spec() -> AppSpec:
         check_in=CheckInSpec(
             stages=(
                 CheckInStageSpec(
-                    "领取每日签到",
+                    "打开签到面板",
                     (
                         target(
                             "百度极速版签到按钮",
                             text_locator("去签到文本", "去签到"),
                             text_locator("立即签到文本", "立即签到", priority=21),
                             ocr_locator("去签到OCR", "去签到", confidence=0.45),
+                        ),
+                    ),
+                    commit_action=False,
+                ),
+                CheckInStageSpec(
+                    "领取今日奖励",
+                    (
+                        target(
+                            "百度极速版领取今日奖励",
+                            text_locator("领取今日奖励文本", "领取今日奖励"),
+                            ocr_locator(
+                                "领取今日奖励OCR",
+                                "领取今日奖励",
+                                mode="exact",
+                                region=Rect(0.15, 0.62, 0.85, 0.78),
+                                confidence=0.45,
+                            ),
                         ),
                     ),
                 ),
@@ -194,6 +230,14 @@ def baidu_lite_spec() -> AppSpec:
                     text_locator("已签到文本", "已签到", contains=True),
                     text_locator("明日再来文本", "明日再来", priority=21),
                     regex_locator("连续签到天数", r"连续签到[1-9]\d*天", priority=22),
+                    ocr_locator(
+                        "下次签到OCR",
+                        "明天",
+                        mode="exact",
+                        region=Rect(0.20, 0.42, 0.60, 0.56),
+                        confidence=0.45,
+                        priority=81,
+                    ),
                     ocr_locator(
                         "签到奖励OCR",
                         r"今日签到\+\d+金币",
@@ -446,10 +490,39 @@ def create_plugin() -> ComposedAppPlugin:
             coordinate_locator("寻宝弹窗右上角关闭坐标", Point(0.87, 0.195)),
         ),
     )
+    newcomer_popup = PopupDismissSpec(
+        marker=target(
+            "百度极速版七天新人奖励弹窗",
+            text_locator("开心收下文本", "开心收下"),
+            ocr_locator("开心收下OCR", "开心收下", mode="exact", confidence=0.45),
+        ),
+        close_target=target(
+            "百度极速版七天新人奖励弹窗关闭",
+            coordinate_locator("七天新人奖励右上角关闭坐标", Point(0.85, 0.255)),
+        ),
+    )
+    coin_pool_popup = PopupDismissSpec(
+        marker=target(
+            "百度极速版瓜分金币弹窗",
+            text_locator("瓜分百亿金币文本", "瓜分百亿金币", contains=True),
+            ocr_locator("瓜分百亿金币OCR", "瓜分百亿金币", confidence=0.45),
+        ),
+        close_target=target(
+            "百度极速版瓜分金币弹窗关闭",
+            coordinate_locator("瓜分金币右上角关闭坐标", Point(0.89, 0.195)),
+        ),
+    )
     task_page = TaskPagePopupNavigator(
         navigation,
-        (automatic_reward, check_in_reward, notification_popup, treasure_popup),
-        max_dismissals=4,
+        (
+            automatic_reward,
+            check_in_reward,
+            notification_popup,
+            treasure_popup,
+            newcomer_popup,
+            coin_pool_popup,
+        ),
+        max_dismissals=6,
         check_after_entry=True,
     )
     pending = BaiduPendingRewardTask(task_page)
