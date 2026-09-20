@@ -193,7 +193,7 @@ class AppSpecLayoutTest(unittest.TestCase):
             create_default_registry().app_ids(),
         )
 
-    def test_fanqie_audio_stops_only_after_balance_fallback(self):
+    def test_fanqie_audio_stops_after_single_balance_and_withdrawal_steps(self):
         context = SimpleNamespace(
             option=lambda key, default: default,
             random=SimpleNamespace(random=lambda: 0.0, randint=lambda start, end: start),
@@ -201,7 +201,8 @@ class AppSpecLayoutTest(unittest.TestCase):
 
         steps = create_fanqie_audio_plugin().build_workflow(context).steps
 
-        self.assertEqual("余额兜底记录", steps[-3].step_id)
+        self.assertEqual(1, sum(step.step_id == "记录余额" for step in steps))
+        self.assertEqual("记录余额", steps[-3].step_id)
         self.assertEqual("更新提现信息", steps[-2].step_id)
         self.assertEqual("停止应用", steps[-1].step_id)
 

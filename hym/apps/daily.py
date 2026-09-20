@@ -121,19 +121,10 @@ class DailyWorkflowBuilder:
             items.extend(self.extra_steps(context))
 
         if self.tasks.balance is not None:
-            balance = StepDefinition(
-                "随机记录余额",
-                "记录余额",
-                self.tasks.balance,
-                recovery=self.navigation.recover_home,
-                task_scope=TaskScope.BALANCE,
-            )
-            items.insert(context.random.randint(0, len(items)), balance)
-            # 随机位置失败时收尾再试一次，成功后任务自身会跳过。
             items.append(
                 StepDefinition(
-                    "余额兜底记录",
-                    "确认余额记录",
+                    "记录余额",
+                    "记录余额",
                     self.tasks.balance,
                     recovery=self.navigation.recover_home,
                     task_scope=TaskScope.BALANCE,

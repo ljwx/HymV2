@@ -69,8 +69,10 @@ def context(actions):
 class RewardTaskTest(unittest.TestCase):
     def test_optional_reward_navigation_failures_are_skipped(self):
         events = []
+        daily = {}
         current = SimpleNamespace(
-            daily_value=lambda key: None,
+            daily_value=lambda key: daily.get(key),
+            mark_daily=lambda key, value: daily.__setitem__(key, {"value": value}),
             daily_action_status=lambda key: DailyActionStatus.NOT_STARTED,
             emit=lambda *args, **kwargs: events.append((args, kwargs)),
         )
@@ -126,11 +128,32 @@ class RewardTaskTest(unittest.TestCase):
             "value": {"value": "约0.0元", "artifacts": []},
             "recorded_at": "2026-09-17T12:00:00+08:00",
         }
-        current.option = lambda key, default: False if key == "record_balance_each_run" else default
 
         outcome = BalanceTask(qutoutiao_spec(), lambda _: False).run(current)
 
         self.assertEqual(WorkflowStatus.ALREADY_DONE, outcome.status)
+
+    def test_failed_balance_observation_is_not_retried_the_same_day(self):
+        daily = {}
+        navigation_calls = []
+        current = context(StubActions())
+        current.daily_value = lambda key: daily.get(key)
+        current.mark_daily = lambda key, value: daily.__setitem__(
+            key,
+            {"value": value},
+        )
+        current.emit = lambda *args, **kwargs: None
+        task = BalanceTask(
+            qutoutiao_spec(),
+            lambda _: navigation_calls.append(True) or False,
+        )
+
+        first = task.run(current)
+        second = task.run(current)
+
+        self.assertEqual(WorkflowStatus.SKIPPED, first.status)
+        self.assertEqual(WorkflowStatus.ALREADY_DONE, second.status)
+        self.assertEqual([True], navigation_calls)
 
     def test_duration_reward_reports_unconfirmed_without_follow_up_clicks(self):
         spec = kuaishou_spec()
@@ -166,6 +189,7 @@ class RewardTaskTest(unittest.TestCase):
             screenshot=ImageFrame(10, 10, b"frame"),
         )
         state = StubState()
+        daily = {}
         events = []
         current = SimpleNamespace(
             actions=actions,
@@ -178,6 +202,10 @@ class RewardTaskTest(unittest.TestCase):
             state=state,
             namespace="device-1:kuaishou",
             business_date=date(2026, 9, 19),
+            daily_value=lambda key: daily.get(key),
+            mark_daily=lambda key, value: daily.__setitem__(key, {"value": value}),
+            option=lambda key, default: default,
+            random=SimpleNamespace(random=lambda: 0.0),
             ocr=SimpleNamespace(
                 recognize=lambda frame: (
                     OcrText("3.20", Rect(0.10, 0.18, 0.25, 0.22), 0.99, "test"),
@@ -209,10 +237,15 @@ class RewardTaskTest(unittest.TestCase):
 
     def test_withdrawal_navigation_failure_is_reported_but_does_not_fail_workflow(self):
         events = []
+        daily = {}
         current = SimpleNamespace(
             state=StubState(),
             namespace="device-1:kuaishou",
             business_date=date(2026, 9, 19),
+            daily_value=lambda key: daily.get(key),
+            mark_daily=lambda key, value: daily.__setitem__(key, {"value": value}),
+            option=lambda key, default: default,
+            random=SimpleNamespace(random=lambda: 0.0),
             ocr=object(),
             emit=lambda *args, **kwargs: events.append((args, kwargs)),
         )
@@ -222,6 +255,36 @@ class RewardTaskTest(unittest.TestCase):
         self.assertEqual(WorkflowStatus.SKIPPED, outcome.status)
         self.assertEqual("reward.withdrawal.unavailable", events[0][0][0])
         self.assertEqual("skipped", events[0][1]["status"])
+
+    def test_withdrawal_refresh_is_sampled_only_once_per_day(self):
+        daily = {}
+        random_calls = []
+        navigation_calls = []
+        current = SimpleNamespace(
+            state=StubState(),
+            namespace="device-1:kuaishou",
+            business_date=date(2026, 9, 19),
+            daily_value=lambda key: daily.get(key),
+            mark_daily=lambda key, value: daily.__setitem__(key, {"value": value}),
+            option=lambda key, default: default,
+            random=SimpleNamespace(
+                random=lambda: random_calls.append(True) or 0.75,
+            ),
+            ocr=object(),
+            emit=lambda *args, **kwargs: None,
+        )
+        task = WithdrawalTask(
+            kuaishou_spec(),
+            lambda _: navigation_calls.append(True) or True,
+        )
+
+        first = task.run(current)
+        second = task.run(current)
+
+        self.assertEqual(WorkflowStatus.SKIPPED, first.status)
+        self.assertEqual(WorkflowStatus.ALREADY_DONE, second.status)
+        self.assertEqual([True], random_calls)
+        self.assertEqual([], navigation_calls)
 
 
 if __name__ == "__main__":

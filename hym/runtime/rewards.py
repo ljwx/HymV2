@@ -242,12 +242,17 @@ class BalanceTask:
     def run(self, context: AppContext) -> StepOutcome:
         recorded = context.daily_value("balance")
         option = getattr(context, "option", lambda _key, default: default)
-        record_each_run = bool(option("record_balance_each_run", True))
+        record_each_run = bool(option("record_balance_each_run", False))
         if not record_each_run and _has_recorded_balance(recorded):
             return StepOutcome(WorkflowStatus.ALREADY_DONE, "今天已经记录过余额")
         spec = self.app_spec.balance
         if spec is None:
             return StepOutcome.skipped("当前应用没有余额流程")
+        attempted = context.daily_value("balance_observation_attempted")
+        if not record_each_run and _has_daily_boolean(attempted):
+            return StepOutcome(WorkflowStatus.ALREADY_DONE, "今天已经尝试记录过余额")
+        if not record_each_run:
+            context.mark_daily("balance_observation_attempted", True)
         if not self.go_task_page(context):
             return _optional_reward_unavailable(context, "记录余额", "记录余额时无法进入任务页")
         if spec.enter_target is not None:
@@ -387,6 +392,13 @@ def _has_recorded_balance(recorded: object) -> bool:
     return bool(value.get("balances") or value.get("value"))
 
 
+def _has_daily_boolean(recorded: object) -> bool:
+    return (
+        isinstance(recorded, dict)
+        and isinstance(recorded.get("value"), bool)
+    )
+
+
 def _amount_minor(value: str | None, scale: int) -> int | None:
     if not value:
         return None
@@ -420,6 +432,17 @@ class WithdrawalTask:
             return StepOutcome.skipped("当前应用没有提现信息流程")
         if self._is_fresh(context, spec):
             return StepOutcome(WorkflowStatus.ALREADY_DONE, "提现信息仍在刷新周期内")
+        decision = context.daily_value("withdrawal_refresh_decision")
+        if _has_daily_boolean(decision):
+            return StepOutcome(WorkflowStatus.ALREADY_DONE, "今天已经决定过是否更新提现信息")
+        probability = max(
+            0.0,
+            min(1.0, float(context.option("withdrawal_refresh_probability", 0.5))),
+        )
+        selected = context.random.random() < probability
+        context.mark_daily("withdrawal_refresh_decision", selected)
+        if not selected:
+            return StepOutcome.skipped("今天未抽中提现信息更新")
         if context.ocr is None:
             return self._unavailable(context, "提现信息需要 OCR，但当前没有可用 OCR 引擎")
         if not self.go_task_page(context):
